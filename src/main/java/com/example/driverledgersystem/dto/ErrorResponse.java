@@ -1,4 +1,4 @@
-package com.example.ledgersystem.dto;
+package com.example.driverledgersystem.dto;
 
 public record ErrorResponse(
         String code,

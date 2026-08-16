@@ -1,1 +1,1 @@
-rootProject.name = "ledger-system"
+rootProject.name = "driver-ledger-system"
