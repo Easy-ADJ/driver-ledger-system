@@ -2,23 +2,26 @@ package com.example.driverledgersystem.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-//원장 분개 내역(거래 기록) 저장 엔티티
+// 원장 분개 내역(거래 기록) 저장 엔티티
 @Entity
 @Table(name = "LEDGER_ENTRIES")
 @Getter
 @Setter
-public class LedgerEntry
-{
+@EntityListeners(AuditingEntityListener.class)
+public class LedgerEntry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "ledger_id")
@@ -43,9 +46,10 @@ public class LedgerEntry
     @Column(name = "direction", length = 10, nullable = false)
     private String direction;
 
-    @Column(name = "amount", precision = 12, scale = 2, nullable = false)
+    @Column(name = "amount", precision = 12, scale = 0, nullable = false)
     private BigDecimal amount;
 
-    @Column(name = "approved_at")
-    private LocalDateTime approvedAt;
+    @CreatedDate
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 }
