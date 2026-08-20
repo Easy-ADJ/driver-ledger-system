@@ -1,0 +1,24 @@
+package com.example.driverledgersystem.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestClient;
+
+/**
+ * 외부 서비스(결제 시스템 등) 통신을 위한 RestClient 설정 클래스입니다.
+ */
+@Configuration
+public class RestClientConfig
+{
+    @Value("${payment.api.base-url}")
+    private String paymentApiBaseUrl;
+
+    @Bean
+    public RestClient paymentRestClient()
+    {
+        return RestClient.builder()
+                .baseUrl(paymentApiBaseUrl)
+                .build();
+    }
+}

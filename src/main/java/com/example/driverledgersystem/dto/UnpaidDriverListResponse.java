@@ -10,7 +10,7 @@ import java.util.List;
 
 @Getter
 @Builder
-public class UnpaidLedgerResponse
+public class UnpaidDriverListResponse
 {
     private String targetDate;
     private List<DriverUnpaidData> data;

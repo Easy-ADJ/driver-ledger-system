@@ -1,8 +1,10 @@
 package com.example.driverledgersystem.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
@@ -16,10 +18,13 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class DriverLedgerResponse
 {
     private Long driverId;
 
+    // 부동소수점 오차 방지를 위해 JSON 응답 시 문자열(String)로 변환
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     private BigDecimal totalUnpaidAmount;
 
@@ -32,6 +37,8 @@ public class DriverLedgerResponse
     @Getter
     @Setter
     @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PaymentDetail
     {
         private Long paymentId;
