@@ -1,6 +1,6 @@
-package com.example.ledgersystem.exception;
+package com.example.driverledgersystem.exception;
 
-import com.example.ledgersystem.dto.ErrorResponse;
+import com.example.driverledgersystem.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
