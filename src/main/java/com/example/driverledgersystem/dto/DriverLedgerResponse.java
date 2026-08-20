@@ -1,8 +1,10 @@
 package com.example.driverledgersystem.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,7 +19,10 @@ import java.util.List;
 public class DriverLedgerResponse
 {
     private Long driverId;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private BigDecimal totalUnpaidAmount;
+
     // 결제 건별 상세 내역
     private List<PaymentDetail> paymentDetails;
 
@@ -30,7 +35,11 @@ public class DriverLedgerResponse
     public static class PaymentDetail
     {
         private Long paymentId;
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
         private BigDecimal amount;
+
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
         private LocalDateTime approvedAt;
     }
 }
