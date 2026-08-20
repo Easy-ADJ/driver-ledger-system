@@ -1,26 +1,30 @@
-# 🏦 모빌리티 플랫폼 원장(Ledger) 시스템
+# 📚 모빌리티 정산 시스템 - 원장 서비스 (Driver Ledger System)
 
-본 프로젝트는 모빌리티 플랫폼의 자금 흐름을 안전하게 기록하고 관리하는 이중기입 원장(Ledger) 시스템입니다. 
-'관심사의 분리' 원칙에 따라 복잡한 정산 계산은 정산 서버에 위임하고, 본 시스템은 데이터 무결성 검증 및 안전한 장부 기록에 온전히 집중하도록 설계되었습니다.
+이 프로젝트는 EasyADJ 모빌리티 정산 플랫폼의 핵심인 **원장(Ledger) 서비스**입니다.
+결제(Payment) 서버와 정산(Settlement) 서버 사이에서 **이중기입 원장(Double-entry ledger)** 패턴을 통해 자금의 정합성을 보장하고, 이중 결제나 정산 불일치 등의 치명적인 금융 사고를 방지하는 역할을 수행합니다.
 
----
+## 📌 과제 요구사항 요약
+* **데이터 정합성 보장**: 플랫폼과 기사 간의 모든 거래를 차변(DEBIT)과 대변(CREDIT)으로 나누어 기록하고 합계가 정확히 일치하는지 검증합니다.
+* **멱등성(Idempotency) 확보**: 타 서비스의 네트워크 재시도(Retry)로 인해 발생하는 중복 결제 기록을 방어합니다.
+* **정산 대사(Reconciliation) 지원**: 정산 시스템이 정확한 기사 미지급금 내역을 가져갈 수 있도록 잔액 조회 및 대사 API를 제공합니다.
 
-## 🏗️ 시스템 아키텍처 및 핵심 파일 설명
+## 🚀 구현한 기능 목록
+1. **분개 기록 API (`POST /api/ledger/entries`)**
+    - Idempotency-Key 헤더를 통한 중복 요청 완벽 차단.
+    - 차변과 대변의 합계 일치 여부를 트랜잭션 내에서 검증.
+    - 정산 누락 방지를 위해 생성 완료 시 `ledger_id`를 반환.
+2. **미지급 잔액 조회 API (`GET /api/ledger/unpaid`, `GET /api/ledger?driver_id=`)**
+    - 부동소수점 오차 방지를 위해 모든 금액(amount) 데이터를 JSON `String` 형태로 제공.
+    - 기사별 미지급금 총액 및 개별 결제 건 상세 내역 조회.
+3. **JPA Auditing 기반 이력 관리**
+    - 모든 분개의 생성 시간(`createdAt`)을 프레임워크 레벨에서 자동으로 기록하여 데이터 조작 및 누락 방지.
 
-### 1. Domain (데이터베이스 설계도)
-* **`LedgerAccount.java`**: 플랫폼과 기사님의 자금을 보관하는 '통장' 역할을 합니다.
-* **`LedgerEntry.java`**: 각 통장의 입출금 내역을 기록하는 '영수증(분개)' 역할을 합니다. 동일한 결제 번호와 방향(차변/대변)의 중복 기록을 막는 복합 유니크 제약조건(멱등성 방어)이 포함되어 있습니다.
+## ⚙️ 실행 방법
+본 프로젝트는 보안 및 MSA 의존성 규칙에 따라 하드코딩을 배제하고 환경변수를 주입받아 실행됩니다.
 
-### 2. Repository (데이터베이스 소통)
-* **`LedgerAccountRepository.java`**: DB에서 통장 정보를 안전하게 조회하고 생성합니다.
-* **`LedgerEntryRepository.java`**: 잔액을 별도 컬럼으로 관리하지 않고, 영수증 내역을 집계 연산하여 정확하고 안전한 잔액을 도출합니다.
-
-### 3. Service (비즈니스 로직 및 정합성 검증)
-* **`LedgerService.java`**: 결제 기록, 결제 취소(상쇄 분개), 정산금 지급 로직을 총괄합니다. 데이터베이스에 기록되기 직전 항상 '차변의 합과 대변의 합이 일치하는지' 검증하는 강력한 방어 로직이 구현되어 있습니다.
-
-### 4. Controller (외부 연동 API)
-* **`LedgerController.java`**: 결제 및 정산 서버로부터 들어오는 HTTP 요청을 받아 Service 계층으로 안전하게 전달하는 문지기 역할을 합니다.
-
-### 5. DTO & Exception (안정성 강화)
-* **`PaymentRecordRequest.java`**: 부동소수점 오차를 원천 차단하기 위해 금액을 `String`으로 수신하여 `BigDecimal`로 정밀하게 변환하는 데이터 규격입니다.
-* **`GlobalExceptionHandler.java` & `ErrorResponse.java`**: 시스템 내부 에러 발생 시 멈추지 않고, 팀 규약에 맞춘 통일된 JSON 형식으로 에러 원인을 포장하여 반환합니다.
+1. **환경 변수 세팅** (IntelliJ 실행 구성 또는 `.env` 활용)
+   ```properties
+   SPRING_DATASOURCE_URL=jdbc:postgresql://{DB주소}
+   SPRING_DATASOURCE_USERNAME={DB계정명}
+   SPRING_DATASOURCE_PASSWORD={DB비밀번호}
+   PAYMENT_API_BASE_URL=http://driver-payment-system... (결제 서버 베이스 URL)

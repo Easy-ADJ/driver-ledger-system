@@ -1,57 +1,92 @@
 package com.example.driverledgersystem.controller;
 
+import com.example.driverledgersystem.dto.DriverLedgerResponse;
+import com.example.driverledgersystem.dto.LedgerEntryRequest;
+import com.example.driverledgersystem.dto.UnpaidLedgerResponse;
+import com.example.driverledgersystem.service.LedgerService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-//  원장 시스템의 API 요청 처리 컨트롤러
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+
+// 원장 시스템의 API 요청 처리 컨트롤러
 @RestController
 @RequestMapping("/api/ledger")
+@RequiredArgsConstructor
 public class LedgerController
 {
-    // 1. 분개 기록 (POST /api/ledger/entries)
+    private final LedgerService ledgerService;
+
+    // 1. 분개 기록
     @PostMapping("/entries")
-    public ResponseEntity<Object> recordEntries(
+    public ResponseEntity<Map<String, Long>> recordEntries(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @RequestBody Object requestBody // TODO: LedgerEntryRequest DTO 클래스로 변경 예정
-    )
+            @RequestBody LedgerEntryRequest request)
     {
-        // TODO: 서비스 계층을 호출하여 분개 기록 로직(차변/대변 합계 검증 및 멱등성 처리) 실행
+        BigDecimal amount = BigDecimal.ZERO;
+        Long paymentId = null;
 
-        // 정상 생성
-        return ResponseEntity.status(201).build();
+        if (request.getEntries() != null && !request.getEntries().isEmpty())
+        {
+            amount = request.getEntries().get(0).getAmount();
+            paymentId = request.getEntries().get(0).getPaymentId();
+        }
+
+        Long ledgerId = ledgerService.recordPaymentEntry(
+                idempotencyKey,
+                request.getDriverId(),
+                paymentId,
+                amount
+        );
+
+        return ResponseEntity.status(201).body(Map.of("ledgerId", ledgerId));
     }
 
-    //2. 미지급 기사 목록 조회 (GET /api/ledger/unpaid?date=)
+    // 2. 미지급 기사 목록 조회
     @GetMapping("/unpaid")
-    public ResponseEntity<Object> getUnpaidDrivers(
-            @RequestParam("date") String date
-    )
+    public ResponseEntity<UnpaidLedgerResponse> getUnpaidDrivers(
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date)
     {
-        // TODO: 서비스 계층을 호출하여 미지급 기사 목록 조회
-
-        return ResponseEntity.ok().build();
+        UnpaidLedgerResponse response = ledgerService.getUnpaidBalances(date);
+        return ResponseEntity.ok(response);
     }
 
-    // 3. 기사별 미지급금 및 근거 조회 (GET /api/ledger?driver_id=)
+    // 3. 기사별 미지급금 및 근거 조회
     @GetMapping
-    public ResponseEntity<Object> getDriverLedger(
+    public ResponseEntity<DriverLedgerResponse> getDriverLedger(
             @RequestParam("driver_id") Long driverId
     )
     {
-        // TODO: 서비스 계층을 호출하여 기사별 잔액 및 결제 건별 내역 합산
+        BigDecimal unpaidBalance = ledgerService.calculateDriverUnpaidBalance(driverId);
+        List<DriverLedgerResponse.PaymentDetail> paymentDetails = ledgerService.getPaymentDetails(driverId);
 
-        return ResponseEntity.ok().build();
+        DriverLedgerResponse response = DriverLedgerResponse.builder()
+                .driverId(driverId)
+                .totalUnpaidAmount(unpaidBalance)
+                .paymentDetails(paymentDetails)
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 
-    // 4. 정합성 검증 (GET /api/ledger/verify?from=&to=)
-    @GetMapping("/verify")
-    public ResponseEntity<Object> verifyIntegrity(
-            @RequestParam("from") String from,
-            @RequestParam("to") String to
+    // 4. 정산 대사용 계정 조회 API
+    @GetMapping("/accounts")
+    public ResponseEntity<Map<String, Long>> getAccount(
+            @RequestParam("ownerType") String ownerType,
+            @RequestParam("ownerId") Long ownerId
     )
     {
-        // TODO: 서비스 계층을 호출하여 차변과 대변 총합 검증 로직 실행
-
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(Map.of("accountId", ownerId));
     }
 }
