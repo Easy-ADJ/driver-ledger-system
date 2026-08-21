@@ -20,7 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-class LedgerServiceTest {
+class LedgerServiceTest
+{
     @Autowired
     private LedgerService ledgerService;
 
@@ -29,7 +30,8 @@ class LedgerServiceTest {
      */
     @Test
     @DisplayName("결제 및 정산 분개 기록 시 잔액 증감 및 미지급 목록 갱신 통합 테스트")
-    void testRecordAndCalculateBalance() {
+    void testRecordAndCalculateBalance()
+    {
         String paymentIdempotencyKey = "test-pay-2026-08-21-001";
         String settlementIdempotencyKey = "test-settlement-2026-08-21-002";
         Long driverId = 1L;

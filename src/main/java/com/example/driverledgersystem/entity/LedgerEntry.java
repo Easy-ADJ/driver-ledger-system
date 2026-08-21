@@ -26,7 +26,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @EntityListeners(AuditingEntityListener.class)
-public class LedgerEntry {
+public class LedgerEntry
+{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
 
@@ -36,7 +37,7 @@ public class LedgerEntry {
     @Column(name = "driver_id", nullable = true)
     private Long driverId;
 
-    @Column(name = "payment_id")
+    @Column(name = "payment_id", nullable = true)
     private Long paymentId;
 
     @Column(name = "idempotency_key", length = 64, nullable = false)
@@ -52,6 +53,6 @@ public class LedgerEntry {
     private BigDecimal amount;
 
     @CreatedDate
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "approved_at", updatable = false)
+    private LocalDateTime approvedAt;
 }
