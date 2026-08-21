@@ -4,6 +4,7 @@ import com.example.driverledgersystem.dto.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -14,6 +15,33 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler
 {
+    /**
+     * 요청 본문을 JSON으로 변환할 수 없는 경우 발생한 예외를 처리합니다.
+     *
+     * @param e 발생한 예외
+     * @return 잘못된 요청 본문에 대한 오류 응답
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException e
+    )
+    {
+        log.warn(
+                "요청 본문 JSON 파싱 실패: {}",
+                e.getMessage()
+        );
+
+        ErrorResponse response = new ErrorResponse(
+                "INVALID_REQUEST",
+                "요청 본문 형식이 올바르지 않습니다.",
+                null
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(response);
+    }
+
     /**
      * 잘못된 요청 값으로 발생한 예외를 처리합니다.
      *
