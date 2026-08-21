@@ -2,6 +2,7 @@ package com.example.driverledgersystem.service;
 
 import com.example.driverledgersystem.dto.DriverLedgerResponse;
 import com.example.driverledgersystem.dto.LedgerEntryRequest;
+import com.example.driverledgersystem.dto.UnpaidDriverListResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -192,5 +193,146 @@ class LedgerReadBehaviorTest
 
         assertThat(balanced)
                 .isTrue();
+    }
+
+    /**
+     * 여러 기사에게 결제, 취소, 정산이 각각 발생해도
+     * 기사별 최종 미지급 잔액이 서로 독립적으로 계산되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("다중 기사 복합 분개에서도 기사별 최종 잔액은 서로 독립적이다")
+    void complexLedgerFlowsRemainIndependentBetweenDrivers()
+    {
+        Long firstDriverId = 205L;
+        Long secondDriverId = 206L;
+
+        ledgerService.recordEntries(
+                "test-multi-driver-first-payment-001",
+                firstDriverId,
+                "PAYMENT",
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                2101L,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                2101L,
+                                "PLATFORM"
+                        )
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-multi-driver-first-cancel-001",
+                firstDriverId,
+                "PAYMENT_CANCEL",
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("5000"),
+                                2101L,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("5000"),
+                                2101L,
+                                "PLATFORM"
+                        )
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-multi-driver-first-settlement-001",
+                firstDriverId,
+                "SETTLEMENT",
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("4000"),
+                                null,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("4000"),
+                                null,
+                                "PLATFORM"
+                        )
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-multi-driver-second-payment-001",
+                secondDriverId,
+                "PAYMENT",
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("20000"),
+                                2201L,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("20000"),
+                                2201L,
+                                "PLATFORM"
+                        )
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-multi-driver-second-settlement-001",
+                secondDriverId,
+                "SETTLEMENT",
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("7000"),
+                                null,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("7000"),
+                                null,
+                                "PLATFORM"
+                        )
+                )
+        );
+
+        BigDecimal firstDriverBalance =
+                ledgerService.calculateDriverUnpaidBalance(firstDriverId);
+
+        BigDecimal secondDriverBalance =
+                ledgerService.calculateDriverUnpaidBalance(secondDriverId);
+
+        assertThat(firstDriverBalance)
+                .isEqualByComparingTo(new BigDecimal("6000"));
+
+        assertThat(secondDriverBalance)
+                .isEqualByComparingTo(new BigDecimal("13000"));
+
+        UnpaidDriverListResponse unpaidList =
+                ledgerService.getUnpaidBalances(LocalDate.now());
+
+        assertThat(unpaidList.getData())
+                .anyMatch(data ->
+                        data.getDriverId().equals(firstDriverId)
+                                && data.getTotalUnpaidAmount()
+                                .compareTo(new BigDecimal("6000")) == 0
+                );
+
+        assertThat(unpaidList.getData())
+                .anyMatch(data ->
+                        data.getDriverId().equals(secondDriverId)
+                                && data.getTotalUnpaidAmount()
+                                .compareTo(new BigDecimal("13000")) == 0
+                );
     }
 }
