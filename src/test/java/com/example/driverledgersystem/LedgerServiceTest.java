@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -558,5 +559,76 @@ class LedgerServiceTest
 
         assertThat(unpaidList.getData())
                 .noneMatch(data -> data.getDriverId().equals(driverId));
+    }
+
+    /**
+     * 조회 기준 날짜보다 이후에 생성된 분개가
+     * 과거 시점의 잔액과 미지급 기사 목록에 포함되지 않는지 확인합니다.
+     */
+    @Test
+    @DisplayName("조회 기준 날짜 이후의 분개는 과거 잔액 및 미지급 목록에 포함되지 않는다")
+    void entriesAfterTargetDateAreExcludedFromPastBalance()
+    {
+        Long driverId = 13L;
+        Long paymentId = 1300L;
+
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+
+        List<LedgerEntryRequest.EntryDetail> entries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-date-boundary-001",
+                driverId,
+                "PAYMENT",
+                entries
+        );
+
+        BigDecimal yesterdayBalance =
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId,
+                        yesterday.atTime(LocalTime.MAX)
+                );
+
+        BigDecimal todayBalance =
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId,
+                        today.atTime(LocalTime.MAX)
+                );
+
+        assertThat(yesterdayBalance)
+                .isEqualByComparingTo(BigDecimal.ZERO);
+
+        assertThat(todayBalance)
+                .isEqualByComparingTo(new BigDecimal("15000"));
+
+        UnpaidDriverListResponse yesterdayUnpaidList =
+                ledgerService.getUnpaidBalances(yesterday);
+
+        UnpaidDriverListResponse todayUnpaidList =
+                ledgerService.getUnpaidBalances(today);
+
+        assertThat(yesterdayUnpaidList.getData())
+                .noneMatch(data -> data.getDriverId().equals(driverId));
+
+        assertThat(todayUnpaidList.getData())
+                .anyMatch(data ->
+                        data.getDriverId().equals(driverId)
+                                && data.getTotalUnpaidAmount()
+                                .compareTo(new BigDecimal("15000")) == 0
+                );
     }
 }
