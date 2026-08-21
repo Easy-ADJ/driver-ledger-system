@@ -22,6 +22,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 원장 분개 기록, 기사별 잔액 조회 및 원장 정합성 검증 API를 제공합니다.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/ledger")
@@ -30,13 +33,24 @@ public class LedgerController
 {
     private final LedgerService ledgerService;
 
+    /**
+     * 하나의 거래에 대한 원장 분개를 기록합니다.
+     *
+     * @param idempotencyKey 요청의 멱등성 키
+     * @param request        원장 분개 기록 요청
+     * @return 생성된 원장 ID
+     */
     @PostMapping("/entries")
     public ResponseEntity<Map<String, Long>> recordEntries(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestBody LedgerEntryRequest request
     )
     {
-        log.info("API 호출됨: POST /api/ledger/entries, Idempotency-Key: {}, 기사 ID: {}", idempotencyKey, request.getDriverId());
+        log.info(
+                "POST /api/ledger/entries - Idempotency-Key: {}, driverId: {}",
+                idempotencyKey,
+                request.getDriverId()
+        );
 
         Long ledgerId = ledgerService.recordEntries(
                 idempotencyKey,
@@ -45,35 +59,63 @@ public class LedgerController
                 request.getEntries()
         );
 
-        return ResponseEntity.status(201).body(Map.of("ledgerId", ledgerId));
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(Map.of("ledgerId", ledgerId));
     }
 
+    /**
+     * 지정된 날짜를 기준으로 미지급 잔액이 존재하는 기사 목록을 조회합니다.
+     *
+     * @param date 조회 기준 날짜
+     * @return 미지급 기사 목록
+     */
     @GetMapping("/unpaid")
     public ResponseEntity<UnpaidDriverListResponse> getUnpaidDrivers(
-            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+            @RequestParam("date")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate date
     )
     {
-        log.info("API 호출됨: GET /api/ledger/unpaid, 요청 날짜: {}", date);
+        log.info(
+                "GET /api/ledger/unpaid - date: {}",
+                date
+        );
 
-        UnpaidDriverListResponse response = ledgerService.getUnpaidBalances(date);
+        UnpaidDriverListResponse response =
+                ledgerService.getUnpaidBalances(date);
+
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * 기사의 현재 미지급 잔액과 결제 근거 내역을 조회합니다.
+     *
+     * @param driverId 기사 ID
+     * @return 기사별 원장 조회 결과
+     */
     @GetMapping
     public ResponseEntity<DriverLedgerResponse> getDriverLedger(
             @RequestParam("driver_id") Long driverId
     )
     {
-        log.info("API 호출됨: GET /api/ledger, 기사 ID: {}", driverId);
+        log.info(
+                "GET /api/ledger - driverId: {}",
+                driverId
+        );
 
-        BigDecimal unpaidBalance = ledgerService.calculateDriverUnpaidBalance(driverId);
-        List<DriverLedgerResponse.PaymentDetail> paymentDetails = ledgerService.getPaymentDetails(driverId);
+        BigDecimal unpaidBalance =
+                ledgerService.calculateDriverUnpaidBalance(driverId);
 
-        DriverLedgerResponse response = DriverLedgerResponse.builder()
-                .driverId(driverId)
-                .totalUnpaidAmount(unpaidBalance)
-                .paymentDetails(paymentDetails)
-                .build();
+        List<DriverLedgerResponse.PaymentDetail> paymentDetails =
+                ledgerService.getPaymentDetails(driverId);
+
+        DriverLedgerResponse response =
+                DriverLedgerResponse.builder()
+                        .driverId(driverId)
+                        .totalUnpaidAmount(unpaidBalance)
+                        .paymentDetails(paymentDetails)
+                        .build();
 
         return ResponseEntity.ok(response);
     }
@@ -95,13 +137,23 @@ public class LedgerController
             LocalDate to
     )
     {
-        log.info("GET /api/ledger/verify - from: {}, to: {}", from, to);
+        log.info(
+                "GET /api/ledger/verify - from: {}, to: {}",
+                from,
+                to
+        );
 
-        boolean balanced = ledgerService.verifyLedgerIntegrity(from, to);
+        boolean balanced =
+                ledgerService.verifyLedgerIntegrity(
+                        from,
+                        to
+                );
 
         if (!balanced)
         {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .build();
         }
 
         return ResponseEntity.ok().build();
