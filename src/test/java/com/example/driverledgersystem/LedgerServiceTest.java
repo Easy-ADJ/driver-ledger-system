@@ -708,4 +708,81 @@ class LedgerServiceTest
                                 .compareTo(new BigDecimal("10000")) == 0
                 );
     }
+
+    /**
+     * 부분 정산이 기사 미지급 잔액에 정상적으로 반영되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("부분 SETTLEMENT 분개 기록 시 기사 미지급 잔액이 일부 감소한다")
+    void partialSettlementReducesDriverUnpaidBalance()
+    {
+        Long driverId = 15L;
+        Long paymentId = 1500L;
+
+        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-partial-settlement-payment-001",
+                driverId,
+                "PAYMENT",
+                paymentEntries
+        );
+
+        BigDecimal balanceAfterPayment =
+                ledgerService.calculateDriverUnpaidBalance(driverId);
+
+        assertThat(balanceAfterPayment)
+                .isEqualByComparingTo(new BigDecimal("15000"));
+
+        List<LedgerEntryRequest.EntryDetail> settlementEntries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("5000"),
+                        null,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("5000"),
+                        null,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-partial-settlement-001",
+                driverId,
+                "SETTLEMENT",
+                settlementEntries
+        );
+
+        BigDecimal balanceAfterSettlement =
+                ledgerService.calculateDriverUnpaidBalance(driverId);
+
+        assertThat(balanceAfterSettlement)
+                .isEqualByComparingTo(new BigDecimal("10000"));
+
+        UnpaidDriverListResponse unpaidList =
+                ledgerService.getUnpaidBalances(LocalDate.now());
+
+        assertThat(unpaidList.getData())
+                .anyMatch(data ->
+                        data.getDriverId().equals(driverId)
+                                && data.getTotalUnpaidAmount()
+                                .compareTo(new BigDecimal("10000")) == 0
+                );
+    }
 }
