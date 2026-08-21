@@ -6,6 +6,7 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,7 +23,23 @@ import java.time.LocalDateTime;
  * PAYMENT, PAYMENT_CANCEL, SETTLEMENT 유형을 지원합니다.
  */
 @Entity
-@Table(name = "LEDGER_ENTRIES")
+@Table(
+        name = "LEDGER_ENTRIES",
+        indexes = {
+                @Index(
+                        name = "idx_ledger_idempotency_key",
+                        columnList = "idempotency_key"
+                ),
+                @Index(
+                        name = "idx_ledger_driver_approved_at",
+                        columnList = "driver_id, approved_at"
+                ),
+                @Index(
+                        name = "idx_ledger_approved_at",
+                        columnList = "approved_at"
+                )
+        }
+)
 @Getter
 @Setter
 @EntityListeners(AuditingEntityListener.class)
@@ -30,7 +47,6 @@ public class LedgerEntry
 {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-
     @Column(name = "ledger_id")
     private Long ledgerId;
 
@@ -40,19 +56,39 @@ public class LedgerEntry
     @Column(name = "payment_id", nullable = true)
     private Long paymentId;
 
-    @Column(name = "idempotency_key", length = 64, nullable = false)
+    @Column(
+            name = "idempotency_key",
+            length = 64,
+            nullable = false
+    )
     private String idempotencyKey;
 
-    @Column(name = "entry_type", length = 20, nullable = false)
+    @Column(
+            name = "entry_type",
+            length = 20,
+            nullable = false
+    )
     private String entryType;
 
-    @Column(name = "direction", length = 10, nullable = false)
+    @Column(
+            name = "direction",
+            length = 10,
+            nullable = false
+    )
     private String direction;
 
-    @Column(name = "amount", precision = 12, scale = 0, nullable = false)
+    @Column(
+            name = "amount",
+            precision = 12,
+            scale = 0,
+            nullable = false
+    )
     private BigDecimal amount;
 
     @CreatedDate
-    @Column(name = "approved_at", updatable = false)
+    @Column(
+            name = "approved_at",
+            updatable = false
+    )
     private LocalDateTime approvedAt;
 }
