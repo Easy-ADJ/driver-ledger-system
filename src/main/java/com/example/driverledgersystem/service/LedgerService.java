@@ -1,5 +1,7 @@
 package com.example.driverledgersystem.service;
 
+import com.example.driverledgersystem.domain.Direction;
+import com.example.driverledgersystem.domain.EntryType;
 import com.example.driverledgersystem.dto.DriverLedgerResponse;
 import com.example.driverledgersystem.dto.LedgerEntryRequest.EntryDetail;
 import com.example.driverledgersystem.dto.UnpaidDriverListResponse;
@@ -45,8 +47,17 @@ public class LedgerService
             List<EntryDetail> entries
     )
     {
+        validateRequest(
+                idempotencyKey,
+                driverId,
+                entryType,
+                entries
+        );
+
         Optional<LedgerEntry> existingEntry =
-                entryRepository.findFirstByIdempotencyKeyOrderByLedgerIdAsc(idempotencyKey);
+                entryRepository.findFirstByIdempotencyKeyOrderByLedgerIdAsc(
+                        idempotencyKey
+                );
 
         if (existingEntry.isPresent())
         {
@@ -59,8 +70,6 @@ public class LedgerService
 
         for (EntryDetail detail : entries)
         {
-            validateIntegerAmount(detail.getAmount());
-
             LedgerEntry entry = new LedgerEntry();
             entry.setIdempotencyKey(idempotencyKey);
 
@@ -94,7 +103,10 @@ public class LedgerService
     @Transactional(readOnly = true)
     public BigDecimal calculateDriverUnpaidBalance(Long driverId)
     {
-        return calculateDriverUnpaidBalance(driverId, LocalDateTime.now());
+        return calculateDriverUnpaidBalance(
+                driverId,
+                LocalDateTime.now()
+        );
     }
 
     /**
@@ -105,12 +117,24 @@ public class LedgerService
      * @return 기준 시각까지의 미지급 잔액
      */
     @Transactional(readOnly = true)
-    public BigDecimal calculateDriverUnpaidBalance(Long driverId, LocalDateTime endOfDay)
+    public BigDecimal calculateDriverUnpaidBalance(
+            Long driverId,
+            LocalDateTime endOfDay
+    )
     {
         BigDecimal totalCredit =
-                entryRepository.sumAmountByDriverIdAndDirectionBefore(driverId, "CREDIT", endOfDay);
+                entryRepository.sumAmountByDriverIdAndDirectionBefore(
+                        driverId,
+                        Direction.CREDIT.name(),
+                        endOfDay
+                );
+
         BigDecimal totalDebit =
-                entryRepository.sumAmountByDriverIdAndDirectionBefore(driverId, "DEBIT", endOfDay);
+                entryRepository.sumAmountByDriverIdAndDirectionBefore(
+                        driverId,
+                        Direction.DEBIT.name(),
+                        endOfDay
+                );
 
         if (totalCredit == null)
         {
@@ -132,17 +156,24 @@ public class LedgerService
      * @return 결제 건별 상세 내역
      */
     @Transactional(readOnly = true)
-    public List<DriverLedgerResponse.PaymentDetail> getPaymentDetails(Long driverId)
+    public List<DriverLedgerResponse.PaymentDetail> getPaymentDetails(
+            Long driverId
+    )
     {
         List<LedgerEntry> entries =
-                entryRepository.findByDriverIdAndEntryType(driverId, "PAYMENT");
+                entryRepository.findByDriverIdAndEntryType(
+                        driverId,
+                        EntryType.PAYMENT.name()
+                );
 
         return entries.stream()
-                .map(entry -> DriverLedgerResponse.PaymentDetail.builder()
-                        .paymentId(entry.getPaymentId())
-                        .amount(entry.getAmount())
-                        .approvedAt(entry.getApprovedAt())
-                        .build())
+                .map(entry ->
+                        DriverLedgerResponse.PaymentDetail.builder()
+                                .paymentId(entry.getPaymentId())
+                                .amount(entry.getAmount())
+                                .approvedAt(entry.getApprovedAt())
+                                .build()
+                )
                 .toList();
     }
 
@@ -155,18 +186,79 @@ public class LedgerService
     @Transactional(readOnly = true)
     public UnpaidDriverListResponse getUnpaidBalances(LocalDate date)
     {
-        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-        List<Long> driverIds = entryRepository.findDistinctDriverIdsBefore(endOfDay);
+        LocalDateTime endOfDay =
+                date.atTime(LocalTime.MAX);
 
-        List<UnpaidDriverListResponse.DriverUnpaidData> dataList = driverIds.stream()
-                .map(driverId -> createDriverUnpaidData(driverId, date, endOfDay))
-                .filter(data -> data.getTotalUnpaidAmount().compareTo(BigDecimal.ZERO) > 0)
-                .toList();
+        List<Long> driverIds =
+                entryRepository.findDistinctDriverIdsBefore(endOfDay);
+
+        List<UnpaidDriverListResponse.DriverUnpaidData> dataList =
+                driverIds.stream()
+                        .map(driverId ->
+                                createDriverUnpaidData(
+                                        driverId,
+                                        date,
+                                        endOfDay
+                                )
+                        )
+                        .filter(data ->
+                                data.getTotalUnpaidAmount()
+                                        .compareTo(BigDecimal.ZERO) > 0
+                        )
+                        .toList();
 
         return UnpaidDriverListResponse.builder()
                 .targetDate(date.toString())
                 .data(dataList)
                 .build();
+    }
+
+    /**
+     * 지정된 기간의 전체 분개 정합성을 검증합니다.
+     *
+     * @param from 조회 시작 날짜
+     * @param to   조회 종료 날짜
+     * @return 원장 정합성이 정상인지 여부
+     */
+    @Transactional(readOnly = true)
+    public boolean verifyLedgerIntegrity(
+            LocalDate from,
+            LocalDate to
+    )
+    {
+        if (from.isAfter(to))
+        {
+            throw new IllegalArgumentException(
+                    "조회 시작 날짜는 종료 날짜보다 이후일 수 없습니다."
+            );
+        }
+
+        LocalDateTime startOfDay =
+                from.atStartOfDay();
+
+        LocalDateTime endOfDay =
+                to.atTime(LocalTime.MAX);
+
+        BigDecimal difference =
+                entryRepository.sumSignedAmountBetween(
+                        startOfDay,
+                        endOfDay
+                );
+
+        boolean balanced =
+                difference.compareTo(BigDecimal.ZERO) == 0;
+
+        if (!balanced)
+        {
+            log.error(
+                    "원장 정합성 이상 - from: {}, to: {}, difference: {}",
+                    from,
+                    to,
+                    difference
+            );
+        }
+
+        return balanced;
     }
 
     /**
@@ -183,19 +275,25 @@ public class LedgerService
             LocalDateTime endOfDay
     )
     {
-        BigDecimal balance = calculateDriverUnpaidBalance(driverId, endOfDay);
-
-        List<LedgerEntry> entries =
-                entryRepository.findByDriverIdAndEntryTypeAndApprovedAtBefore(
+        BigDecimal balance =
+                calculateDriverUnpaidBalance(
                         driverId,
-                        "PAYMENT",
                         endOfDay
                 );
 
-        LocalDateTime lastApprovedAt = entries.stream()
-                .map(LedgerEntry::getApprovedAt)
-                .max(LocalDateTime::compareTo)
-                .orElse(date.atStartOfDay());
+        List<LedgerEntry> entries =
+                entryRepository
+                        .findByDriverIdAndEntryTypeAndApprovedAtBefore(
+                                driverId,
+                                EntryType.PAYMENT.name(),
+                                endOfDay
+                        );
+
+        LocalDateTime lastApprovedAt =
+                entries.stream()
+                        .map(LedgerEntry::getApprovedAt)
+                        .max(LocalDateTime::compareTo)
+                        .orElse(date.atStartOfDay());
 
         return UnpaidDriverListResponse.DriverUnpaidData.builder()
                 .driverId(driverId)
@@ -205,15 +303,151 @@ public class LedgerService
     }
 
     /**
-     * 원장 금액이 1원 단위의 정수인지 검증합니다.
+     * 원장 분개 요청의 필수 값을 검증합니다.
+     *
+     * @param idempotencyKey 요청의 멱등성 키
+     * @param driverId       기사 ID
+     * @param entryType      분개 유형
+     * @param entries        분개 목록
+     */
+    private void validateRequest(
+            String idempotencyKey,
+            Long driverId,
+            String entryType,
+            List<EntryDetail> entries
+    )
+    {
+        if (idempotencyKey == null || idempotencyKey.isBlank())
+        {
+            throw new IllegalArgumentException(
+                    "Idempotency-Key는 필수입니다."
+            );
+        }
+
+        if (driverId == null)
+        {
+            throw new IllegalArgumentException(
+                    "driverId는 필수입니다."
+            );
+        }
+
+        validateEntryType(entryType);
+
+        if (entries == null || entries.isEmpty())
+        {
+            throw new IllegalArgumentException(
+                    "분개 목록은 비어 있을 수 없습니다."
+            );
+        }
+
+        for (EntryDetail entry : entries)
+        {
+            validateEntry(
+                    entryType,
+                    entry
+            );
+        }
+    }
+
+    /**
+     * 분개 유형이 허용된 값인지 검증합니다.
+     *
+     * @param entryType 분개 유형
+     */
+    private void validateEntryType(String entryType)
+    {
+        if (entryType == null)
+        {
+            throw new IllegalArgumentException(
+                    "지원하지 않는 entryType입니다."
+            );
+        }
+
+        try
+        {
+            EntryType.valueOf(entryType);
+        } catch (IllegalArgumentException e)
+        {
+            throw new IllegalArgumentException(
+                    "지원하지 않는 entryType입니다."
+            );
+        }
+    }
+
+    /**
+     * 개별 분개의 방향, 금액 및 결제 ID 규칙을 검증합니다.
+     *
+     * @param entryType 분개 유형
+     * @param entry     개별 분개
+     */
+    private void validateEntry(
+            String entryType,
+            EntryDetail entry
+    )
+    {
+        if (entry == null)
+        {
+            throw new IllegalArgumentException(
+                    "분개 내역은 null일 수 없습니다."
+            );
+        }
+
+        validateDirection(entry.getDirection());
+        validateAmount(entry.getAmount());
+
+        if (EntryType.SETTLEMENT.name().equals(entryType)
+                && entry.getPaymentId() != null)
+        {
+            throw new IllegalArgumentException(
+                    "SETTLEMENT 분개의 paymentId는 null이어야 합니다."
+            );
+        }
+    }
+
+    /**
+     * 분개 방향이 허용된 값인지 검증합니다.
+     *
+     * @param direction 분개 방향
+     */
+    private void validateDirection(String direction)
+    {
+        if (direction == null)
+        {
+            throw new IllegalArgumentException(
+                    "direction은 DEBIT 또는 CREDIT이어야 합니다."
+            );
+        }
+
+        try
+        {
+            Direction.valueOf(direction);
+        } catch (IllegalArgumentException e)
+        {
+            throw new IllegalArgumentException(
+                    "direction은 DEBIT 또는 CREDIT이어야 합니다."
+            );
+        }
+    }
+
+    /**
+     * 원장 금액이 유효한 원화 정수인지 검증합니다.
      *
      * @param amount 검증할 금액
      */
-    private void validateIntegerAmount(BigDecimal amount)
+    private void validateAmount(BigDecimal amount)
     {
-        if (amount != null && amount.stripTrailingZeros().scale() > 0)
+        if (amount == null)
         {
-            throw new IllegalArgumentException("원장 금액은 1원 단위의 정수여야 합니다.");
+            throw new IllegalArgumentException(
+                    "분개 금액은 필수입니다."
+            );
+        }
+
+        if (amount.stripTrailingZeros().scale() > 0)
+        {
+            throw new IllegalArgumentException(
+                    "원장 금액은 1원 단위의 정수여야 합니다."
+            );
         }
     }
 
@@ -229,56 +463,22 @@ public class LedgerService
 
         for (EntryDetail entry : entries)
         {
-            if ("DEBIT".equals(entry.getDirection()))
+            if (Direction.DEBIT.name().equals(entry.getDirection()))
             {
-                totalDebit = totalDebit.add(entry.getAmount());
-            } else if ("CREDIT".equals(entry.getDirection()))
+                totalDebit =
+                        totalDebit.add(entry.getAmount());
+            } else
             {
-                totalCredit = totalCredit.add(entry.getAmount());
+                totalCredit =
+                        totalCredit.add(entry.getAmount());
             }
         }
 
         if (totalDebit.compareTo(totalCredit) != 0)
         {
-            throw new IllegalArgumentException("차변과 대변의 합이 일치하지 않습니다.");
-        }
-    }
-
-    /**
-     * 지정된 기간의 전체 분개 정합성을 검증합니다.
-     * <p>
-     * 기간 내 전체 분개의 signed sum이 0이면 true를 반환합니다.
-     *
-     * @param from 조회 시작 날짜
-     * @param to   조회 종료 날짜
-     * @return 원장 정합성이 정상인지 여부
-     */
-    @Transactional(readOnly = true)
-    public boolean verifyLedgerIntegrity(LocalDate from, LocalDate to)
-    {
-        if (from.isAfter(to))
-        {
-            throw new IllegalArgumentException("조회 시작 날짜는 종료 날짜보다 이후일 수 없습니다.");
-        }
-
-        LocalDateTime startOfDay = from.atStartOfDay();
-        LocalDateTime endOfDay = to.atTime(LocalTime.MAX);
-
-        BigDecimal difference =
-                entryRepository.sumSignedAmountBetween(startOfDay, endOfDay);
-
-        boolean balanced = difference.compareTo(BigDecimal.ZERO) == 0;
-
-        if (!balanced)
-        {
-            log.error(
-                    "원장 정합성 이상 - from: {}, to: {}, difference: {}",
-                    from,
-                    to,
-                    difference
+            throw new IllegalArgumentException(
+                    "차변과 대변의 합이 일치하지 않습니다."
             );
         }
-
-        return balanced;
     }
 }
