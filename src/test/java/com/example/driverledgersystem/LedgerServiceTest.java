@@ -631,4 +631,81 @@ class LedgerServiceTest
                                 .compareTo(new BigDecimal("15000")) == 0
                 );
     }
+
+    /**
+     * 부분 결제 취소가 기사 미지급 잔액에 정상적으로 반영되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("부분 PAYMENT_CANCEL 분개 기록 시 기사 미지급 잔액이 일부 감소한다")
+    void partialPaymentCancelReducesDriverUnpaidBalance()
+    {
+        Long driverId = 14L;
+        Long paymentId = 1400L;
+
+        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-partial-cancel-payment-001",
+                driverId,
+                "PAYMENT",
+                paymentEntries
+        );
+
+        BigDecimal balanceAfterPayment =
+                ledgerService.calculateDriverUnpaidBalance(driverId);
+
+        assertThat(balanceAfterPayment)
+                .isEqualByComparingTo(new BigDecimal("15000"));
+
+        List<LedgerEntryRequest.EntryDetail> cancelEntries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("5000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("5000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-partial-cancel-001",
+                driverId,
+                "PAYMENT_CANCEL",
+                cancelEntries
+        );
+
+        BigDecimal balanceAfterCancel =
+                ledgerService.calculateDriverUnpaidBalance(driverId);
+
+        assertThat(balanceAfterCancel)
+                .isEqualByComparingTo(new BigDecimal("10000"));
+
+        UnpaidDriverListResponse unpaidList =
+                ledgerService.getUnpaidBalances(LocalDate.now());
+
+        assertThat(unpaidList.getData())
+                .anyMatch(data ->
+                        data.getDriverId().equals(driverId)
+                                && data.getTotalUnpaidAmount()
+                                .compareTo(new BigDecimal("10000")) == 0
+                );
+    }
 }
