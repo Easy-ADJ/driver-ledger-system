@@ -35,6 +35,6 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>
 
     List<LedgerEntry> findByDriverIdAndEntryTypeAndCreatedAtBefore(Long driverId, String entryType, LocalDateTime endOfDay);
 
-    @Query("SELECT DISTINCT e.driverId FROM LedgerEntry e WHERE e.createdAt <= :endOfDay")
+    @Query("SELECT DISTINCT e.driverId FROM LedgerEntry e WHERE e.createdAt <= :endOfDay AND e.driverId IS NOT NULL")
     List<Long> findDistinctDriverIdsBefore(@Param("endOfDay") LocalDateTime endOfDay);
 }
