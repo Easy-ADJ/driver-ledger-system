@@ -27,7 +27,7 @@ public class LedgerEntry {
     @Column(name = "ledger_id")
     private Long ledgerId;
 
-    @Column(name = "driver_id")
+    @Column(name = "driver_id", nullable = true)
     private Long driverId;
 
     // 정산(PAYOUT) 지급 분개 시에는 결제 ID가 없으므로 nullable
