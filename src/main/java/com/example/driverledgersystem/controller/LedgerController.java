@@ -81,17 +81,4 @@ public class LedgerController
 
         return ResponseEntity.ok(response);
     }
-
-    // 7. 정산 대사용 계정 조회 API
-    @GetMapping("/accounts")
-    public ResponseEntity<Map<String, Long>> getAccount(
-            @RequestParam("ownerType") String ownerType,
-            @RequestParam("ownerId") Long ownerId
-    )
-    {
-        // 8. 대사용 계정 조회 API 호출 로그
-        log.info("API 호출됨: GET /api/ledger/accounts, ownerType: {}, ownerId: {}", ownerType, ownerId);
-
-        return ResponseEntity.ok(Map.of("accountId", ownerId));
-    }
 }

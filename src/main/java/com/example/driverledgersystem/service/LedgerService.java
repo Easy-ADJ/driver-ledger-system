@@ -3,9 +3,7 @@ package com.example.driverledgersystem.service;
 import com.example.driverledgersystem.dto.DriverLedgerResponse;
 import com.example.driverledgersystem.dto.LedgerEntryRequest.EntryDetail;
 import com.example.driverledgersystem.dto.UnpaidDriverListResponse;
-import com.example.driverledgersystem.entity.LedgerAccount;
 import com.example.driverledgersystem.entity.LedgerEntry;
-import com.example.driverledgersystem.repository.LedgerAccountRepository;
 import com.example.driverledgersystem.repository.LedgerEntryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,7 +21,6 @@ import java.util.Optional;
 public class LedgerService
 {
     private final LedgerEntryRepository entryRepository;
-    private final LedgerAccountRepository ledgerAccountRepository;
 
     private void validateIntegerAmount(BigDecimal amount)
     {
@@ -50,7 +47,8 @@ public class LedgerService
     // 차변/대변 리스트 전체를 순회하여 DB에 분개 기록
     private Long processEntries(String idempotencyKey, Long driverId, String entryType, List<EntryDetail> entries)
     {
-        Optional<LedgerEntry> existingEntry = entryRepository.findByIdempotencyKey(idempotencyKey);
+        Optional<LedgerEntry> existingEntry =
+                entryRepository.findFirstByIdempotencyKeyOrderByLedgerIdAsc(idempotencyKey);
         if (existingEntry.isPresent())
         {
             return existingEntry.get().getLedgerId();
@@ -182,13 +180,5 @@ public class LedgerService
         {
             throw new IllegalArgumentException("차변과 대변의 합이 일치하지 않습니다.");
         }
-    }
-
-    public Long getAccountId(String ownerType, Long ownerId)
-    {
-        LedgerAccount account = ledgerAccountRepository.findByOwnerTypeAndOwnerId(ownerType, ownerId)
-                .orElseThrow(() -> new IllegalArgumentException("해당 조건의 원장 계정을 찾을 수 없습니다. ownerType: " + ownerType + ", ownerId: " + ownerId));
-
-        return account.getAccountId();
     }
 }

@@ -27,18 +27,18 @@ public class LedgerEntry {
     @Column(name = "ledger_id")
     private Long ledgerId;
 
-    @Column(name = "driver_id", nullable = false)
+    @Column(name = "driver_id")
     private Long driverId;
 
-    // 정산(SETTLEMENT) 지급 분개 시에는 결제 ID가 없으므로 nullable
+    // 정산(PAYOUT) 지급 분개 시에는 결제 ID가 없으므로 nullable
     @Column(name = "payment_id")
     private Long paymentId;
 
     // 동시 중복 결제 방지
-    @Column(name = "idempotency_key", length = 64, unique = true, nullable = false)
+    @Column(name = "idempotency_key", length = 64, nullable = false)
     private String idempotencyKey;
 
-    // PAYMENT, PAYMENT_CANCEL, SETTLEMENT
+    // PAYMENT, PAYMENT_CANCEL, PAYOUT
     @Column(name = "entry_type", length = 20, nullable = false)
     private String entryType;
 

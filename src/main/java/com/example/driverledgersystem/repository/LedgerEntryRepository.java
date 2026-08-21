@@ -15,7 +15,7 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>
     //동일한 멱등성 키를 가진 기록이 존재하는지 확인(중복 방어)
     boolean existsByIdempotencyKey(String idempotencyKey);
 
-    Optional<LedgerEntry> findByIdempotencyKey(String idempotencyKey);
+    Optional<LedgerEntry> findFirstByIdempotencyKeyOrderByLedgerIdAsc(String idempotencyKey);
 
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM LedgerEntry e WHERE e.driverId = :driverId AND e.direction = :direction")
     BigDecimal sumAmountByDriverIdAndDirection(
