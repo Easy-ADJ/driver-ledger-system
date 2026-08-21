@@ -34,7 +34,7 @@ public class LedgerEntryRequest
 
         @JsonFormat(shape = JsonFormat.Shape.STRING)
         private BigDecimal amount;
-
         private Long paymentId;
+        private String ownerType;
     }
 }
