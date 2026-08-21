@@ -17,10 +17,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-// import com.example.driverledgersystem.repository.LedgerEntryRepository;
-
 /**
- * 원장 분개 기록, 잔액 계산, 정합성 검증에 대한 통합 테스트입니다.
+ * 원장 분개 기록, 잔액 계산, 정합성 검증 및 입력값 검증에 대한 통합 테스트입니다.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -29,9 +27,6 @@ class LedgerServiceTest
 {
     @Autowired
     private LedgerService ledgerService;
-
-    // @Autowired
-    // private LedgerEntryRepository entryRepository;
 
     /**
      * 결제 및 정산 분개 기록에 따라 기사 미지급 잔액과
@@ -222,8 +217,7 @@ class LedgerServiceTest
     }
 
     /**
-     * 차변과 대변의 합계가 일치하지 않는 요청이
-     * 거부되는지 확인합니다.
+     * 차변과 대변의 합계가 일치하지 않는 요청이 거부되는지 확인합니다.
      */
     @Test
     @DisplayName("차변과 대변의 합계가 일치하지 않으면 분개 기록에 실패한다")
@@ -261,8 +255,7 @@ class LedgerServiceTest
     }
 
     /**
-     * 동일한 멱등성 키로 요청이 다시 전달될 때
-     * 기존 처리 결과를 반환하는지 확인합니다.
+     * 동일한 멱등성 키로 요청이 다시 전달될 때 기존 처리 결과를 반환하는지 확인합니다.
      */
     @Test
     @DisplayName("동일한 Idempotency-Key 재요청은 중복 분개를 생성하지 않는다")
@@ -303,5 +296,194 @@ class LedgerServiceTest
 
         assertThat(secondLedgerId)
                 .isEqualTo(firstLedgerId);
+    }
+
+    /**
+     * 멱등성 키가 비어 있는 요청이 거부되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("Idempotency-Key가 비어 있으면 분개 기록에 실패한다")
+    void recordEntriesThrowsExceptionWhenIdempotencyKeyIsBlank()
+    {
+        List<LedgerEntryRequest.EntryDetail> entries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("10000"),
+                        600L,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("10000"),
+                        600L,
+                        "PLATFORM"
+                )
+        );
+
+        assertThatThrownBy(
+                () -> ledgerService.recordEntries(
+                        " ",
+                        6L,
+                        "PAYMENT",
+                        entries
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Idempotency-Key는 필수입니다.");
+    }
+
+    /**
+     * 지원하지 않는 분개 유형이 거부되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("지원하지 않는 entryType이면 분개 기록에 실패한다")
+    void recordEntriesThrowsExceptionWhenEntryTypeIsInvalid()
+    {
+        List<LedgerEntryRequest.EntryDetail> entries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("10000"),
+                        700L,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("10000"),
+                        700L,
+                        "PLATFORM"
+                )
+        );
+
+        assertThatThrownBy(
+                () -> ledgerService.recordEntries(
+                        "test-invalid-type-001",
+                        7L,
+                        "HELLO",
+                        entries
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("지원하지 않는 entryType입니다.");
+    }
+
+    /**
+     * 분개 목록이 비어 있는 요청이 거부되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("분개 목록이 비어 있으면 분개 기록에 실패한다")
+    void recordEntriesThrowsExceptionWhenEntriesAreEmpty()
+    {
+        assertThatThrownBy(
+                () -> ledgerService.recordEntries(
+                        "test-empty-entries-001",
+                        8L,
+                        "PAYMENT",
+                        List.of()
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("분개 목록은 비어 있을 수 없습니다.");
+    }
+
+    /**
+     * 허용되지 않은 분개 방향이 거부되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("direction이 DEBIT 또는 CREDIT이 아니면 분개 기록에 실패한다")
+    void recordEntriesThrowsExceptionWhenDirectionIsInvalid()
+    {
+        List<LedgerEntryRequest.EntryDetail> entries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "ABC",
+                        new BigDecimal("10000"),
+                        900L,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("10000"),
+                        900L,
+                        "PLATFORM"
+                )
+        );
+
+        assertThatThrownBy(
+                () -> ledgerService.recordEntries(
+                        "test-invalid-direction-001",
+                        9L,
+                        "PAYMENT",
+                        entries
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("direction은 DEBIT 또는 CREDIT이어야 합니다.");
+    }
+
+    /**
+     * 금액이 없는 분개 요청이 거부되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("분개 금액이 null이면 분개 기록에 실패한다")
+    void recordEntriesThrowsExceptionWhenAmountIsNull()
+    {
+        List<LedgerEntryRequest.EntryDetail> entries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        null,
+                        1000L,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("10000"),
+                        1000L,
+                        "PLATFORM"
+                )
+        );
+
+        assertThatThrownBy(
+                () -> ledgerService.recordEntries(
+                        "test-null-amount-001",
+                        10L,
+                        "PAYMENT",
+                        entries
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("분개 금액은 필수입니다.");
+    }
+
+    /**
+     * 정산 분개에 paymentId가 포함된 요청이 거부되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("SETTLEMENT 분개의 paymentId가 존재하면 분개 기록에 실패한다")
+    void recordEntriesThrowsExceptionWhenSettlementHasPaymentId()
+    {
+        List<LedgerEntryRequest.EntryDetail> entries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("10000"),
+                        1100L,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("10000"),
+                        null,
+                        "PLATFORM"
+                )
+        );
+
+        assertThatThrownBy(
+                () -> ledgerService.recordEntries(
+                        "test-settlement-payment-id-001",
+                        11L,
+                        "SETTLEMENT",
+                        entries
+                )
+        )
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("SETTLEMENT 분개의 paymentId는 null이어야 합니다.");
     }
 }
