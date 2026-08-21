@@ -6,6 +6,7 @@ import com.example.driverledgersystem.dto.UnpaidDriverListResponse;
 import com.example.driverledgersystem.entity.LedgerEntry;
 import com.example.driverledgersystem.repository.LedgerEntryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.Optional;
 /**
  * 원장 분개 기록과 기사별 미지급금 계산을 담당하는 서비스입니다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LedgerService
@@ -240,5 +242,43 @@ public class LedgerService
         {
             throw new IllegalArgumentException("차변과 대변의 합이 일치하지 않습니다.");
         }
+    }
+
+    /**
+     * 지정된 기간의 전체 분개 정합성을 검증합니다.
+     * <p>
+     * 기간 내 전체 분개의 signed sum이 0이면 true를 반환합니다.
+     *
+     * @param from 조회 시작 날짜
+     * @param to   조회 종료 날짜
+     * @return 원장 정합성이 정상인지 여부
+     */
+    @Transactional(readOnly = true)
+    public boolean verifyLedgerIntegrity(LocalDate from, LocalDate to)
+    {
+        if (from.isAfter(to))
+        {
+            throw new IllegalArgumentException("조회 시작 날짜는 종료 날짜보다 이후일 수 없습니다.");
+        }
+
+        LocalDateTime startOfDay = from.atStartOfDay();
+        LocalDateTime endOfDay = to.atTime(LocalTime.MAX);
+
+        BigDecimal difference =
+                entryRepository.sumSignedAmountBetween(startOfDay, endOfDay);
+
+        boolean balanced = difference.compareTo(BigDecimal.ZERO) == 0;
+
+        if (!balanced)
+        {
+            log.error(
+                    "원장 정합성 이상 - from: {}, to: {}, difference: {}",
+                    from,
+                    to,
+                    difference
+            );
+        }
+
+        return balanced;
     }
 }

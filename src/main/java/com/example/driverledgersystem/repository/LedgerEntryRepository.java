@@ -35,4 +35,33 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>
 
     @Query("SELECT DISTINCT e.driverId FROM LedgerEntry e WHERE e.approvedAt <= :endOfDay AND e.driverId IS NOT NULL")
     List<Long> findDistinctDriverIdsBefore(@Param("endOfDay") LocalDateTime endOfDay);
+
+    /**
+     * 지정된 기간의 전체 분개 합계를 계산합니다.
+     *
+     * CREDIT은 양수, DEBIT은 음수로 계산합니다.
+     *
+     * @param from 조회 시작 시각
+     * @param to 조회 종료 시각
+     * @return 기간 내 전체 분개의 합계
+     */
+    @Query("""
+        SELECT COALESCE(
+            SUM(
+                CASE
+                    WHEN e.direction = 'CREDIT' THEN e.amount
+                    WHEN e.direction = 'DEBIT' THEN -e.amount
+                    ELSE 0
+                END
+            ),
+            0
+        )
+        FROM LedgerEntry e
+        WHERE e.approvedAt >= :from
+          AND e.approvedAt <= :to
+        """)
+    BigDecimal sumSignedAmountBetween(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 }
