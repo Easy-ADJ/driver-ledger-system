@@ -486,4 +486,77 @@ class LedgerServiceTest
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("SETTLEMENT 분개의 paymentId는 null이어야 합니다.");
     }
+
+    /**
+     * 결제 취소 분개가 기사 미지급 잔액을 정상적으로 상쇄하는지 확인합니다.
+     */
+    @Test
+    @DisplayName("PAYMENT_CANCEL 분개 기록 시 기사 미지급 잔액이 감소한다")
+    void paymentCancelReducesDriverUnpaidBalance()
+    {
+        Long driverId = 12L;
+        Long paymentId = 1200L;
+
+        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-payment-cancel-payment-001",
+                driverId,
+                "PAYMENT",
+                paymentEntries
+        );
+
+        BigDecimal balanceAfterPayment =
+                ledgerService.calculateDriverUnpaidBalance(driverId);
+
+        assertThat(balanceAfterPayment)
+                .isEqualByComparingTo(new BigDecimal("15000"));
+
+        List<LedgerEntryRequest.EntryDetail> cancelEntries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-payment-cancel-001",
+                driverId,
+                "PAYMENT_CANCEL",
+                cancelEntries
+        );
+
+        BigDecimal balanceAfterCancel =
+                ledgerService.calculateDriverUnpaidBalance(driverId);
+
+        assertThat(balanceAfterCancel)
+                .isEqualByComparingTo(BigDecimal.ZERO);
+
+        UnpaidDriverListResponse unpaidList =
+                ledgerService.getUnpaidBalances(LocalDate.now());
+
+        assertThat(unpaidList.getData())
+                .noneMatch(data -> data.getDriverId().equals(driverId));
+    }
 }

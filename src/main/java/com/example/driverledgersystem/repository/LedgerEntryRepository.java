@@ -10,56 +10,107 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 원장 분개 데이터의 조회 및 집계를 담당하는 Repository입니다.
+ */
 public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>
 {
-
-    Optional<LedgerEntry> findFirstByIdempotencyKeyOrderByLedgerIdAsc(String idempotencyKey);
-
-    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM LedgerEntry e WHERE e.driverId = :driverId AND e.direction = :direction")
-    BigDecimal sumAmountByDriverIdAndDirection(
-            @Param("driverId") Long driverId,
-            @Param("direction") String direction
+    /**
+     * 멱등성 키에 해당하는 최초 원장 분개를 조회합니다.
+     *
+     * @param idempotencyKey 요청의 멱등성 키
+     * @return 최초 원장 분개
+     */
+    Optional<LedgerEntry> findFirstByIdempotencyKeyOrderByLedgerIdAsc(
+            String idempotencyKey
     );
 
-    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM LedgerEntry e WHERE e.driverId = :driverId AND e.direction = :direction AND e.approvedAt <= :endOfDay")
+    /**
+     * 지정된 시각까지 기사의 특정 방향 분개 금액 합계를 계산합니다.
+     *
+     * @param driverId  기사 ID
+     * @param direction 분개 방향
+     * @param endOfDay  조회 기준 시각
+     * @return 분개 금액 합계
+     */
+    @Query("""
+            SELECT COALESCE(SUM(e.amount), 0)
+            FROM LedgerEntry e
+            WHERE e.driverId = :driverId
+              AND e.direction = :direction
+              AND e.approvedAt <= :endOfDay
+            """)
     BigDecimal sumAmountByDriverIdAndDirectionBefore(
             @Param("driverId") Long driverId,
             @Param("direction") String direction,
             @Param("endOfDay") LocalDateTime endOfDay
     );
 
-    // 기사별 결제 건별 상세 목록 조회
-    List<LedgerEntry> findByDriverIdAndEntryType(Long driverId, String entryType);
+    /**
+     * 기사의 특정 분개 유형에 해당하는 원장 내역을 조회합니다.
+     *
+     * @param driverId  기사 ID
+     * @param entryType 분개 유형
+     * @return 원장 분개 목록
+     */
+    List<LedgerEntry> findByDriverIdAndEntryType(
+            Long driverId,
+            String entryType
+    );
 
-    List<LedgerEntry> findByDriverIdAndEntryTypeAndApprovedAtBefore(Long driverId, String entryType, LocalDateTime endOfDay);
+    /**
+     * 지정된 시각까지 기사의 특정 분개 유형에 해당하는 원장 내역을 조회합니다.
+     *
+     * @param driverId  기사 ID
+     * @param entryType 분개 유형
+     * @param endOfDay  조회 기준 시각
+     * @return 원장 분개 목록
+     */
+    List<LedgerEntry> findByDriverIdAndEntryTypeAndApprovedAtBefore(
+            Long driverId,
+            String entryType,
+            LocalDateTime endOfDay
+    );
 
-    @Query("SELECT DISTINCT e.driverId FROM LedgerEntry e WHERE e.approvedAt <= :endOfDay AND e.driverId IS NOT NULL")
-    List<Long> findDistinctDriverIdsBefore(@Param("endOfDay") LocalDateTime endOfDay);
+    /**
+     * 지정된 시각까지 원장 기록이 존재하는 기사 ID 목록을 조회합니다.
+     *
+     * @param endOfDay 조회 기준 시각
+     * @return 기사 ID 목록
+     */
+    @Query("""
+            SELECT DISTINCT e.driverId
+            FROM LedgerEntry e
+            WHERE e.approvedAt <= :endOfDay
+              AND e.driverId IS NOT NULL
+            """)
+    List<Long> findDistinctDriverIdsBefore(
+            @Param("endOfDay") LocalDateTime endOfDay
+    );
 
     /**
      * 지정된 기간의 전체 분개 합계를 계산합니다.
-     *
      * CREDIT은 양수, DEBIT은 음수로 계산합니다.
      *
      * @param from 조회 시작 시각
-     * @param to 조회 종료 시각
+     * @param to   조회 종료 시각
      * @return 기간 내 전체 분개의 합계
      */
     @Query("""
-        SELECT COALESCE(
-            SUM(
-                CASE
-                    WHEN e.direction = 'CREDIT' THEN e.amount
-                    WHEN e.direction = 'DEBIT' THEN -e.amount
-                    ELSE 0
-                END
-            ),
-            0
-        )
-        FROM LedgerEntry e
-        WHERE e.approvedAt >= :from
-          AND e.approvedAt <= :to
-        """)
+            SELECT COALESCE(
+                SUM(
+                    CASE
+                        WHEN e.direction = 'CREDIT' THEN e.amount
+                        WHEN e.direction = 'DEBIT' THEN -e.amount
+                        ELSE 0
+                    END
+                ),
+                0
+            )
+            FROM LedgerEntry e
+            WHERE e.approvedAt >= :from
+              AND e.approvedAt <= :to
+            """)
     BigDecimal sumSignedAmountBetween(
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
