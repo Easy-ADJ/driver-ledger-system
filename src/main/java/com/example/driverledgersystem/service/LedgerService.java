@@ -68,15 +68,21 @@ public class LedgerService
 
             LedgerEntry entry = new LedgerEntry();
             entry.setIdempotencyKey(idempotencyKey);
-            entry.setDriverId(driverId);
-            entry.setPaymentId(detail.getPaymentId()); // 상쇄(PAYOUT)일 경우 null 허용됨
-            entry.setEntryType(entryType); // "PAYMENT" or "PAYOUT"
-            entry.setDirection(detail.getDirection()); // "DEBIT" or "CREDIT"
+
+            // 💡 핵심: 기사 쪽 분개("DRIVER")일 때만 driverId를 세팅하고, 플랫폼 쪽은 null로 둡니다.
+            if ("DRIVER".equals(detail.getOwnerType())) {
+                entry.setDriverId(driverId);
+            } else {
+                entry.setDriverId(null);
+            }
+
+            entry.setPaymentId(detail.getPaymentId());
+            entry.setEntryType(entryType);
+            entry.setDirection(detail.getDirection());
             entry.setAmount(detail.getAmount());
 
             LedgerEntry saved = entryRepository.save(entry);
 
-            // 첫 번째 생성된 ledgerId를 대표로 반환하기 위해 저장
             if (firstLedgerId == null)
             {
                 firstLedgerId = saved.getLedgerId();
@@ -99,11 +105,11 @@ public class LedgerService
         BigDecimal totalCredit = entryRepository.sumAmountByDriverIdAndDirectionBefore(driverId, "CREDIT", endOfDay);
         BigDecimal totalDebit = entryRepository.sumAmountByDriverIdAndDirectionBefore(driverId, "DEBIT", endOfDay);
 
-        // NULL 방어 로직
         if (totalCredit == null) totalCredit = BigDecimal.ZERO;
         if (totalDebit == null) totalDebit = BigDecimal.ZERO;
 
-        return totalCredit.subtract(totalDebit).abs();
+        // 💡 수정됨: .abs()를 제거하여 음수가 발생하면 그대로 정산 서버로 넘어가게 합니다.
+        return totalCredit.subtract(totalDebit);
     }
 
     // 3. 결제 상세 내역 조회
