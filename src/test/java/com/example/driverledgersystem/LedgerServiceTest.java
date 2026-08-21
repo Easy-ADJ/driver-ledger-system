@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@Transactional
 class LedgerServiceTest
 {
     @Autowired
@@ -105,5 +107,44 @@ class LedgerServiceTest
                 ledgerService.getUnpaidBalances(today);
 
         assertThat(unpaidListAfter.getData()).isEmpty();
+    }
+
+    /**
+     * 균형 잡힌 차변과 대변 분개가 존재할 때 원장 정합성 검증이 성공하는지 확인합니다.
+     */
+    @Test
+    @DisplayName("기간 내 차변과 대변 합계가 일치하면 정합성 검증에 성공한다")
+    void verifyLedgerIntegrityReturnsTrueWhenBalanced()
+    {
+        String idempotencyKey = "test-verify-2026-08-22-001";
+        Long driverId = 2L;
+        Long paymentId = 200L;
+        LocalDate today = LocalDate.now();
+
+        List<LedgerEntryRequest.EntryDetail> entries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("10000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("10000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                idempotencyKey,
+                driverId,
+                "PAYMENT",
+                entries
+        );
+
+        boolean balanced = ledgerService.verifyLedgerIntegrity(today, today);
+
+        assertThat(balanced).isTrue();
     }
 }
