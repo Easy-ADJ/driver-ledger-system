@@ -50,10 +50,10 @@ public class LedgerEntry
     @Column(name = "ledger_id")
     private Long ledgerId;
 
-    @Column(name = "driver_id", nullable = true)
+    @Column(name = "driver_id")
     private Long driverId;
 
-    @Column(name = "payment_id", nullable = true)
+    @Column(name = "payment_id")
     private Long paymentId;
 
     @Column(

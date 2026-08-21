@@ -21,9 +21,14 @@ public class GlobalExceptionHandler
      * @return 잘못된 요청에 대한 오류 응답
      */
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException e)
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
+            IllegalArgumentException e
+    )
     {
-        log.warn("잘못된 요청 발생: {}", e.getMessage());
+        log.warn(
+                "잘못된 요청 발생: {}",
+                e.getMessage()
+        );
 
         ErrorResponse response = new ErrorResponse(
                 "INVALID_REQUEST",
@@ -43,9 +48,14 @@ public class GlobalExceptionHandler
      * @return 서버 내부 오류 응답
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleAllExceptions(Exception e)
+    public ResponseEntity<ErrorResponse> handleAllExceptions(
+            Exception e
+    )
     {
-        log.error("서버 내부 오류 발생", e);
+        log.error(
+                "서버 내부 오류 발생",
+                e
+        );
 
         ErrorResponse response = new ErrorResponse(
                 "INTERNAL_SERVER_ERROR",
