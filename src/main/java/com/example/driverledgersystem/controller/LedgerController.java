@@ -26,20 +26,18 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ledger")
 @RequiredArgsConstructor
-public class LedgerController
-{
+public class LedgerController {
     private final LedgerService ledgerService;
 
     // 1. 분개 기록
     @PostMapping("/entries")
     public ResponseEntity<Map<String, Long>> recordEntries(
             @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @RequestBody LedgerEntryRequest request)
-    {
+            @RequestBody LedgerEntryRequest request) {
         // 2. 분개 기록 API 호출 로그
         log.info("API 호출됨: POST /api/ledger/entries, Idempotency-Key: {}, 기사 ID: {}", idempotencyKey, request.getDriverId());
 
-        Long ledgerId = ledgerService.recordPaymentEntry(
+        Long ledgerId = ledgerService.recordEntries(
                 idempotencyKey,
                 request.getDriverId(),
                 request.getEntryType(),
@@ -52,8 +50,7 @@ public class LedgerController
     // 3. 미지급 기사 목록 조회
     @GetMapping("/unpaid")
     public ResponseEntity<UnpaidDriverListResponse> getUnpaidDrivers(
-            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date)
-    {
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         // 👉 4. 미지급 목록 조회 API 호출 로그
         log.info("API 호출됨: GET /api/ledger/unpaid, 요청 날짜: {}", date);
 
@@ -65,8 +62,7 @@ public class LedgerController
     @GetMapping
     public ResponseEntity<DriverLedgerResponse> getDriverLedger(
             @RequestParam("driver_id") Long driverId
-    )
-    {
+    ) {
         // 6. 단건 잔액 조회 API 호출 로그
         log.info("API 호출됨: GET /api/ledger, 기사 ID: {}", driverId);
 
