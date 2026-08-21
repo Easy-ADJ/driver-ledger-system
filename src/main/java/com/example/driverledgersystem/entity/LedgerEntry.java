@@ -15,7 +15,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-// 원장 분개 내역(거래 기록) 저장 엔티티
+/**
+ * 원장의 개별 분개 내역을 저장하는 엔티티입니다.
+ * <p>
+ * 하나의 거래는 차변(DEBIT)과 대변(CREDIT) 분개로 구성되며,
+ * PAYMENT, PAYMENT_CANCEL, SETTLEMENT 유형을 지원합니다.
+ */
 @Entity
 @Table(name = "LEDGER_ENTRIES")
 @Getter
@@ -24,25 +29,22 @@ import java.time.LocalDateTime;
 public class LedgerEntry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+
     @Column(name = "ledger_id")
     private Long ledgerId;
 
     @Column(name = "driver_id", nullable = true)
     private Long driverId;
 
-    // 정산(PAYOUT) 지급 분개 시에는 결제 ID가 없으므로 nullable
     @Column(name = "payment_id")
     private Long paymentId;
 
-    // 동시 중복 결제 방지
     @Column(name = "idempotency_key", length = 64, nullable = false)
     private String idempotencyKey;
 
-    // PAYMENT, PAYMENT_CANCEL, PAYOUT
     @Column(name = "entry_type", length = 20, nullable = false)
     private String entryType;
 
-    // DEBIT(차변/예수금) 또는 CREDIT(대변/미지급금)
     @Column(name = "direction", length = 10, nullable = false)
     private String direction;
 
