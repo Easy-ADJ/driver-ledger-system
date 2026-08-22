@@ -73,6 +73,18 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>
     );
 
     /**
+     * 기사의 여러 분개 유형에 해당하는 원장 내역을 조회합니다.
+     *
+     * @param driverId   기사 ID
+     * @param entryTypes 조회할 분개 유형 목록
+     * @return 원장 분개 목록
+     */
+    List<LedgerEntry> findByDriverIdAndEntryTypeIn(
+            Long driverId,
+            List<String> entryTypes
+    );
+
+    /**
      * 지정된 시각까지 원장 기록이 존재하는 기사 ID 목록을 조회합니다.
      *
      * @param endOfDay 조회 기준 시각

@@ -161,9 +161,12 @@ public class LedgerService
     )
     {
         List<LedgerEntry> entries =
-                entryRepository.findByDriverIdAndEntryType(
+                entryRepository.findByDriverIdAndEntryTypeIn(
                         driverId,
-                        EntryType.PAYMENT.name()
+                        List.of(
+                                EntryType.PAYMENT.name(),
+                                EntryType.PAYMENT_CANCEL.name()
+                        )
                 );
 
         return entries.stream()
@@ -172,6 +175,7 @@ public class LedgerService
                                 .paymentId(entry.getPaymentId())
                                 .amount(entry.getAmount())
                                 .approvedAt(entry.getApprovedAt())
+                                .entryType(entry.getEntryType())
                                 .build()
                 )
                 .toList();

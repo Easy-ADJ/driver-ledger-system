@@ -48,5 +48,7 @@ public class DriverLedgerResponse
                 timezone = "UTC"
         )
         private LocalDateTime approvedAt;
+
+        private String entryType;
     }
 }
