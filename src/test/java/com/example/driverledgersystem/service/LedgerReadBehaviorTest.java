@@ -110,12 +110,12 @@ class LedgerReadBehaviorTest
     }
 
     /**
-     * 기사 결제 상세 조회에서 PAYMENT 분개만 반환되고
-     * PAYMENT_CANCEL 분개는 포함되지 않는지 확인합니다.
+     * 기사 결제 상세 조회에서 PAYMENT와 PAYMENT_CANCEL 분개가
+     * 모두 포함되고 각 entryType이 정확하게 반환되는지 확인합니다.
      */
     @Test
-    @DisplayName("결제 상세 조회에는 PAYMENT 분개만 포함된다")
-    void getPaymentDetailsReturnsOnlyPaymentEntries()
+    @DisplayName("결제 상세 조회에는 PAYMENT와 PAYMENT_CANCEL 분개가 포함된다")
+    void getPaymentDetailsReturnsPaymentAndPaymentCancelEntries()
     {
         Long driverId = 204L;
         Long paymentId = 2003L;
@@ -168,13 +168,33 @@ class LedgerReadBehaviorTest
                 ledgerService.getPaymentDetails(driverId);
 
         assertThat(paymentDetails)
-                .hasSize(1);
+                .hasSize(2);
 
-        assertThat(paymentDetails.get(0).getPaymentId())
-                .isEqualTo(paymentId);
+        assertThat(paymentDetails)
+                .anySatisfy(detail ->
+                {
+                    assertThat(detail.getPaymentId())
+                            .isEqualTo(paymentId);
 
-        assertThat(paymentDetails.get(0).getAmount())
-                .isEqualByComparingTo(new BigDecimal("15000"));
+                    assertThat(detail.getAmount())
+                            .isEqualByComparingTo(new BigDecimal("15000"));
+
+                    assertThat(detail.getEntryType())
+                            .isEqualTo("PAYMENT");
+                });
+
+        assertThat(paymentDetails)
+                .anySatisfy(detail ->
+                {
+                    assertThat(detail.getPaymentId())
+                            .isEqualTo(paymentId);
+
+                    assertThat(detail.getAmount())
+                            .isEqualByComparingTo(new BigDecimal("5000"));
+
+                    assertThat(detail.getEntryType())
+                            .isEqualTo("PAYMENT_CANCEL");
+                });
     }
 
     /**

@@ -891,4 +891,92 @@ class LedgerServiceTest
                                 .compareTo(new BigDecimal("6000")) == 0
                 );
     }
+
+    /**
+     * 기사별 결제 상세 조회 시 PAYMENT와 PAYMENT_CANCEL 내역이
+     * 모두 포함되고 각 entryType이 정확하게 반환되는지 확인합니다.
+     */
+    @Test
+    @DisplayName("기사별 결제 상세 조회에 PAYMENT와 PAYMENT_CANCEL이 모두 포함된다")
+    void getPaymentDetailsIncludesPaymentAndPaymentCancel()
+    {
+        Long driverId = 17L;
+        Long paymentId = 1700L;
+
+        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("15000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-payment-details-payment-001",
+                driverId,
+                "PAYMENT",
+                paymentEntries
+        );
+
+        List<LedgerEntryRequest.EntryDetail> cancelEntries = List.of(
+                new LedgerEntryRequest.EntryDetail(
+                        "DEBIT",
+                        new BigDecimal("5000"),
+                        paymentId,
+                        "DRIVER"
+                ),
+                new LedgerEntryRequest.EntryDetail(
+                        "CREDIT",
+                        new BigDecimal("5000"),
+                        paymentId,
+                        "PLATFORM"
+                )
+        );
+
+        ledgerService.recordEntries(
+                "test-payment-details-cancel-001",
+                driverId,
+                "PAYMENT_CANCEL",
+                cancelEntries
+        );
+
+        var paymentDetails =
+                ledgerService.getPaymentDetails(driverId);
+
+        assertThat(paymentDetails)
+                .hasSize(2);
+
+        assertThat(paymentDetails)
+                .anySatisfy(detail ->
+                {
+                    assertThat(detail.getPaymentId())
+                            .isEqualTo(paymentId);
+
+                    assertThat(detail.getAmount())
+                            .isEqualByComparingTo(new BigDecimal("15000"));
+
+                    assertThat(detail.getEntryType())
+                            .isEqualTo("PAYMENT");
+                });
+
+        assertThat(paymentDetails)
+                .anySatisfy(detail ->
+                {
+                    assertThat(detail.getPaymentId())
+                            .isEqualTo(paymentId);
+
+                    assertThat(detail.getAmount())
+                            .isEqualByComparingTo(new BigDecimal("5000"));
+
+                    assertThat(detail.getEntryType())
+                            .isEqualTo("PAYMENT_CANCEL");
+                });
+    }
 }
