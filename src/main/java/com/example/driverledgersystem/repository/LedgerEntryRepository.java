@@ -85,6 +85,26 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>
     );
 
     /**
+     * 지정된 기간 동안 발생한 기사의 여러 분개 유형을 조회합니다.
+     *
+     * approvedAt은 startInclusive 이상,
+     * endExclusive 미만인 분개만 반환합니다.
+     *
+     * @param driverId       기사 ID
+     * @param entryTypes     조회할 분개 유형 목록
+     * @param startInclusive 조회 시작 시각
+     * @param endExclusive   조회 종료 시각
+     * @return 원장 분개 목록
+     */
+    List<LedgerEntry>
+    findByDriverIdAndEntryTypeInAndApprovedAtGreaterThanEqualAndApprovedAtLessThan(
+            Long driverId,
+            List<String> entryTypes,
+            LocalDateTime startInclusive,
+            LocalDateTime endExclusive
+    );
+
+    /**
      * 지정된 시각까지 원장 기록이 존재하는 기사 ID 목록을 조회합니다.
      *
      * @param endOfDay 조회 기준 시각
