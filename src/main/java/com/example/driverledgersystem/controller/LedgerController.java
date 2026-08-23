@@ -4,6 +4,7 @@ import com.example.driverledgersystem.dto.DriverLedgerResponse;
 import com.example.driverledgersystem.dto.LedgerEntryRequest;
 import com.example.driverledgersystem.dto.UnpaidDriverListResponse;
 import com.example.driverledgersystem.service.LedgerService;
+import com.example.driverledgersystem.service.PaymentSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -32,6 +33,7 @@ import java.util.Map;
 public class LedgerController
 {
     private final LedgerService ledgerService;
+    private final PaymentSyncService paymentSyncService;
 
     /**
      * 하나의 거래에 대한 원장 분개를 기록합니다.
@@ -52,16 +54,51 @@ public class LedgerController
                 request.getDriverId()
         );
 
-        Long ledgerId = ledgerService.recordEntries(
-                idempotencyKey,
-                request.getDriverId(),
-                request.getEntryType(),
-                request.getEntries()
-        );
+        Long ledgerId =
+                ledgerService.recordEntries(
+                        idempotencyKey,
+                        request.getDriverId(),
+                        request.getEntryType(),
+                        request.getEntries()
+                );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(Map.of("ledgerId", ledgerId));
+                .body(
+                        Map.of(
+                                "ledgerId",
+                                ledgerId
+                        )
+                );
+    }
+
+    /**
+     * 결제 서버의 기사별 결제 내역을 원장으로 동기화합니다.
+     *
+     * @param driverId 기사 ID
+     * @return 새로 원장에 저장한 결제 건수
+     */
+    @PostMapping("/sync")
+    public ResponseEntity<Map<String, Integer>> syncPayments(
+            @RequestParam("driver_id") Long driverId
+    )
+    {
+        log.info(
+                "POST /api/ledger/sync - driverId: {}",
+                driverId
+        );
+
+        int syncedCount =
+                paymentSyncService.syncPayments(
+                        driverId
+                );
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "syncedCount",
+                        syncedCount
+                )
+        );
     }
 
     /**
@@ -90,7 +127,7 @@ public class LedgerController
 
     /**
      * 기사의 현재 미지급 잔액과 결제 근거 내역을 조회합니다.
-     *
+     * <p>
      * from, to가 모두 지정되면 해당 기간의 결제 근거 내역만 반환합니다.
      * from, to가 모두 없으면 기존과 동일하게 전체 결제 근거 내역을 반환합니다.
      *
@@ -126,7 +163,9 @@ public class LedgerController
         );
 
         BigDecimal unpaidBalance =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         List<DriverLedgerResponse.PaymentDetail> paymentDetails =
                 ledgerService.getPaymentDetails(

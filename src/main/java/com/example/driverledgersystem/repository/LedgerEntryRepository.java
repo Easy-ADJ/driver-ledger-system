@@ -26,6 +26,20 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>
     );
 
     /**
+     * 특정 기사의 특정 결제가 이미 원장에 기록되어 있는지 확인합니다.
+     *
+     * @param driverId  기사 ID
+     * @param paymentId 결제 ID
+     * @param entryType 분개 유형
+     * @return 존재 여부
+     */
+    boolean existsByDriverIdAndPaymentIdAndEntryType(
+            Long driverId,
+            Long paymentId,
+            String entryType
+    );
+
+    /**
      * 지정된 시각까지 기사의 특정 방향 분개 금액 합계를 계산합니다.
      *
      * @param driverId  기사 ID
@@ -86,7 +100,7 @@ public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long>
 
     /**
      * 지정된 기간 동안 발생한 기사의 여러 분개 유형을 조회합니다.
-     *
+     * <p>
      * approvedAt은 startInclusive 이상,
      * endExclusive 미만인 분개만 반환합니다.
      *
