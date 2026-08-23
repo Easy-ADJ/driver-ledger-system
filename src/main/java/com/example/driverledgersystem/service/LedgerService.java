@@ -150,7 +150,7 @@ public class LedgerService
     }
 
     /**
-     * 기사에게 발생한 결제 분개 내역을 조회합니다.
+     * 기사에게 발생한 전체 결제 분개 내역을 조회합니다.
      *
      * @param driverId 기사 ID
      * @return 결제 건별 상세 내역
@@ -160,14 +160,72 @@ public class LedgerService
             Long driverId
     )
     {
-        List<LedgerEntry> entries =
-                entryRepository.findByDriverIdAndEntryTypeIn(
-                        driverId,
-                        List.of(
-                                EntryType.PAYMENT.name(),
-                                EntryType.PAYMENT_CANCEL.name()
-                        )
+        return getPaymentDetails(
+                driverId,
+                null,
+                null
+        );
+    }
+
+    /**
+     * 기사에게 발생한 결제 분개 내역을 조회합니다.
+     *
+     * from, to가 모두 null이면 전체 결제 내역을 조회합니다.
+     * from, to가 모두 지정되면 해당 기간의 결제 내역만 조회합니다.
+     *
+     * 조회 기간은 from의 00:00:00 이상,
+     * to 다음 날의 00:00:00 미만으로 처리합니다.
+     *
+     * @param driverId 기사 ID
+     * @param from     조회 시작 날짜
+     * @param to       조회 종료 날짜
+     * @return 결제 건별 상세 내역
+     */
+    @Transactional(readOnly = true)
+    public List<DriverLedgerResponse.PaymentDetail> getPaymentDetails(
+            Long driverId,
+            LocalDate from,
+            LocalDate to
+    )
+    {
+        validatePaymentDetailPeriod(
+                from,
+                to
+        );
+
+        List<String> paymentEntryTypes =
+                List.of(
+                        EntryType.PAYMENT.name(),
+                        EntryType.PAYMENT_CANCEL.name()
                 );
+
+        List<LedgerEntry> entries;
+
+        if (from == null)
+        {
+            entries =
+                    entryRepository.findByDriverIdAndEntryTypeIn(
+                            driverId,
+                            paymentEntryTypes
+                    );
+        }
+        else
+        {
+            LocalDateTime startInclusive =
+                    from.atStartOfDay();
+
+            LocalDateTime endExclusive =
+                    to.plusDays(1).atStartOfDay();
+
+            entries =
+                    entryRepository
+                            .findByDriverIdAndEntryTypeInAndApprovedAtGreaterThanEqualAndApprovedAtLessThan(
+                                    driverId,
+                                    paymentEntryTypes,
+                                    startInclusive,
+                                    endExclusive
+                            );
+        }
 
         return entries.stream()
                 .map(entry ->
@@ -179,6 +237,34 @@ public class LedgerService
                                 .build()
                 )
                 .toList();
+    }
+
+    /**
+     * 결제 내역 조회 기간 파라미터를 검증합니다.
+     *
+     * from과 to는 둘 다 존재하거나 둘 다 없어야 합니다.
+     *
+     * @param from 조회 시작 날짜
+     * @param to   조회 종료 날짜
+     */
+    private void validatePaymentDetailPeriod(
+            LocalDate from,
+            LocalDate to
+    )
+    {
+        if ((from == null) != (to == null))
+        {
+            throw new IllegalArgumentException(
+                    "from과 to는 함께 지정해야 합니다."
+            );
+        }
+
+        if (from != null && from.isAfter(to))
+        {
+            throw new IllegalArgumentException(
+                    "조회 시작 날짜는 종료 날짜보다 이후일 수 없습니다."
+            );
+        }
     }
 
     /**
@@ -370,7 +456,8 @@ public class LedgerService
         try
         {
             EntryType.valueOf(entryType);
-        } catch (IllegalArgumentException e)
+        }
+        catch (IllegalArgumentException e)
         {
             throw new IllegalArgumentException(
                     "지원하지 않는 entryType입니다."
@@ -425,7 +512,8 @@ public class LedgerService
         try
         {
             Direction.valueOf(direction);
-        } catch (IllegalArgumentException e)
+        }
+        catch (IllegalArgumentException e)
         {
             throw new IllegalArgumentException(
                     "direction은 DEBIT 또는 CREDIT이어야 합니다."
@@ -471,7 +559,8 @@ public class LedgerService
             {
                 totalDebit =
                         totalDebit.add(entry.getAmount());
-            } else
+            }
+            else
             {
                 totalCredit =
                         totalCredit.add(entry.getAmount());

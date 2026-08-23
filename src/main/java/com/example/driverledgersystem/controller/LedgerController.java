@@ -91,24 +91,49 @@ public class LedgerController
     /**
      * 기사의 현재 미지급 잔액과 결제 근거 내역을 조회합니다.
      *
+     * from, to가 모두 지정되면 해당 기간의 결제 근거 내역만 반환합니다.
+     * from, to가 모두 없으면 기존과 동일하게 전체 결제 근거 내역을 반환합니다.
+     *
      * @param driverId 기사 ID
+     * @param from     결제 내역 조회 시작 날짜
+     * @param to       결제 내역 조회 종료 날짜
      * @return 기사별 원장 조회 결과
      */
     @GetMapping
     public ResponseEntity<DriverLedgerResponse> getDriverLedger(
-            @RequestParam("driver_id") Long driverId
+            @RequestParam("driver_id") Long driverId,
+
+            @RequestParam(
+                    value = "from",
+                    required = false
+            )
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate from,
+
+            @RequestParam(
+                    value = "to",
+                    required = false
+            )
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate to
     )
     {
         log.info(
-                "GET /api/ledger - driverId: {}",
-                driverId
+                "GET /api/ledger - driverId: {}, from: {}, to: {}",
+                driverId,
+                from,
+                to
         );
 
         BigDecimal unpaidBalance =
                 ledgerService.calculateDriverUnpaidBalance(driverId);
 
         List<DriverLedgerResponse.PaymentDetail> paymentDetails =
-                ledgerService.getPaymentDetails(driverId);
+                ledgerService.getPaymentDetails(
+                        driverId,
+                        from,
+                        to
+                );
 
         DriverLedgerResponse response =
                 DriverLedgerResponse.builder()
@@ -132,6 +157,7 @@ public class LedgerController
             @RequestParam("from")
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate from,
+
             @RequestParam("to")
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate to
