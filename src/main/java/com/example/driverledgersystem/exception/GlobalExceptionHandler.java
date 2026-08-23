@@ -1,98 +1,189 @@
 package com.example.driverledgersystem.exception;
 
 import com.example.driverledgersystem.dto.ErrorResponse;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import java.util.UUID;
 
 /**
- * Ledger API에서 발생하는 예외를 공통 형식으로 처리합니다.
+ * 원장 서버에서 발생하는 예외를 공통 오류 형식으로 변환합니다.
  */
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler
 {
+    private static final Logger log =
+            LoggerFactory.getLogger(
+                    GlobalExceptionHandler.class
+            );
+
+    private static final String INTERNAL_ERROR_MESSAGE =
+            "원장 서버 내부 오류가 발생했습니다.";
+
     /**
-     * 요청 본문을 JSON으로 변환할 수 없는 경우 발생한 예외를 처리합니다.
-     *
-     * @param e 발생한 예외
-     * @return 잘못된 요청 본문에 대한 오류 응답
+     * 원장 서버에서 의도적으로 발생시킨 비즈니스 예외를 처리합니다.
+     */
+    @ExceptionHandler(LedgerException.class)
+    public ResponseEntity<ErrorResponse> handleLedgerException(
+            LedgerException e
+    )
+    {
+        String transactionId =
+                currentTransactionId();
+
+        log.warn(
+                "[{}] {}: {}",
+                transactionId,
+                e.getCode(),
+                e.getMessage()
+        );
+
+        return respond(
+                e.getStatus(),
+                e.getCode(),
+                e.getMessage(),
+                transactionId
+        );
+    }
+
+    /**
+     * 잘못된 JSON 요청을 처리합니다.
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+    public ResponseEntity<ErrorResponse> handleInvalidJson(
             HttpMessageNotReadableException e
     )
     {
+        String transactionId =
+                currentTransactionId();
+
+        String message =
+                "요청 본문 형식이 올바르지 않습니다.";
+
         log.warn(
-                "요청 본문 JSON 파싱 실패: {}",
-                e.getMessage()
+                "[{}] INVALID_REQUEST: {}",
+                transactionId,
+                message
         );
 
-        ErrorResponse response = new ErrorResponse(
+        return respond(
+                HttpStatus.BAD_REQUEST,
                 "INVALID_REQUEST",
-                "요청 본문 형식이 올바르지 않습니다.",
-                null
+                message,
+                transactionId
         );
-
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(response);
     }
 
     /**
-     * 잘못된 요청 값으로 발생한 예외를 처리합니다.
-     *
-     * @param e 발생한 예외
-     * @return 잘못된 요청에 대한 오류 응답
+     * 필수 쿼리 파라미터 누락을 처리합니다.
      */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
-            IllegalArgumentException e
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(
+            MissingServletRequestParameterException e
     )
     {
+        String transactionId =
+                currentTransactionId();
+
+        String message =
+                "필수 파라미터가 누락되었습니다: "
+                        + e.getParameterName();
+
         log.warn(
-                "잘못된 요청 발생: {}",
-                e.getMessage()
+                "[{}] MISSING_REQUIRED_PARAMETER: {}",
+                transactionId,
+                message
         );
 
-        ErrorResponse response = new ErrorResponse(
-                "INVALID_REQUEST",
-                e.getMessage(),
-                null
+        return respond(
+                HttpStatus.BAD_REQUEST,
+                "MISSING_REQUIRED_PARAMETER",
+                message,
+                transactionId
         );
-
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(response);
     }
 
     /**
-     * 처리되지 않은 서버 내부 예외를 처리합니다.
-     *
-     * @param e 발생한 예외
-     * @return 서버 내부 오류 응답
+     * 날짜 등 쿼리 파라미터 형식 오류를 처리합니다.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException e
+    )
+    {
+        String transactionId =
+                currentTransactionId();
+
+        String message =
+                "파라미터 형식이 올바르지 않습니다: "
+                        + e.getName();
+
+        log.warn(
+                "[{}] INVALID_PARAMETER_FORMAT: {}",
+                transactionId,
+                message
+        );
+
+        return respond(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_PARAMETER_FORMAT",
+                message,
+                transactionId
+        );
+    }
+
+    /**
+     * 예상하지 못한 예외를 처리합니다.
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleAllExceptions(
+    public ResponseEntity<ErrorResponse> handleUnexpected(
             Exception e
     )
     {
+        String transactionId =
+                currentTransactionId();
+
         log.error(
-                "서버 내부 오류 발생",
+                "[{}] INTERNAL_ERROR",
+                transactionId,
                 e
         );
 
-        ErrorResponse response = new ErrorResponse(
-                "INTERNAL_SERVER_ERROR",
-                "원장 서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-                null
+        return respond(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR",
+                INTERNAL_ERROR_MESSAGE,
+                transactionId
         );
+    }
 
+    private String currentTransactionId()
+    {
+        return UUID.randomUUID().toString();
+    }
+
+    private static ResponseEntity<ErrorResponse> respond(
+            HttpStatus status,
+            String code,
+            String message,
+            String transactionId
+    )
+    {
         return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(response);
+                .status(status)
+                .body(
+                        new ErrorResponse(
+                                code,
+                                message,
+                                transactionId
+                        )
+                );
     }
 }

@@ -2,6 +2,13 @@ package com.example.driverledgersystem;
 
 import com.example.driverledgersystem.dto.LedgerEntryRequest;
 import com.example.driverledgersystem.dto.UnpaidDriverListResponse;
+import com.example.driverledgersystem.exception.InvalidAmountException;
+import com.example.driverledgersystem.exception.InvalidDateRangeException;
+import com.example.driverledgersystem.exception.InvalidDirectionException;
+import com.example.driverledgersystem.exception.InvalidEntryTypeException;
+import com.example.driverledgersystem.exception.InvalidLedgerRequestException;
+import com.example.driverledgersystem.exception.InvalidSettlementEntryException;
+import com.example.driverledgersystem.exception.UnbalancedEntryException;
 import com.example.driverledgersystem.service.LedgerService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,22 +48,24 @@ class LedgerServiceTest
         Long paymentId = 100L;
         LocalDate today = LocalDate.now();
 
-        String paymentIdempotencyKey = "test-payment-001";
+        String paymentIdempotencyKey =
+                "test-payment-001";
 
-        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> paymentEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 paymentIdempotencyKey,
@@ -66,39 +75,59 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterPayment =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterPayment)
-                .isEqualByComparingTo(new BigDecimal("15000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("15000")
+                );
 
         UnpaidDriverListResponse unpaidListBefore =
-                ledgerService.getUnpaidBalances(today);
+                ledgerService.getUnpaidBalances(
+                        today
+                );
 
         assertThat(unpaidListBefore.getData())
                 .hasSize(1);
 
-        assertThat(unpaidListBefore.getData().get(0).getDriverId())
+        assertThat(
+                unpaidListBefore
+                        .getData()
+                        .get(0)
+                        .getDriverId()
+        )
                 .isEqualTo(driverId);
 
-        assertThat(unpaidListBefore.getData().get(0).getTotalUnpaidAmount())
-                .isEqualByComparingTo(new BigDecimal("15000"));
+        assertThat(
+                unpaidListBefore
+                        .getData()
+                        .get(0)
+                        .getTotalUnpaidAmount()
+        )
+                .isEqualByComparingTo(
+                        new BigDecimal("15000")
+                );
 
-        String settlementIdempotencyKey = "test-settlement-001";
+        String settlementIdempotencyKey =
+                "test-settlement-001";
 
-        List<LedgerEntryRequest.EntryDetail> settlementEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        null,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        null,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> settlementEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                null,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                null,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 settlementIdempotencyKey,
@@ -108,13 +137,19 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterSettlement =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterSettlement)
-                .isEqualByComparingTo(BigDecimal.ZERO);
+                .isEqualByComparingTo(
+                        BigDecimal.ZERO
+                );
 
         UnpaidDriverListResponse unpaidListAfter =
-                ledgerService.getUnpaidBalances(today);
+                ledgerService.getUnpaidBalances(
+                        today
+                );
 
         assertThat(unpaidListAfter.getData())
                 .isEmpty();
@@ -128,25 +163,30 @@ class LedgerServiceTest
     @DisplayName("기간 내 차변과 대변 합계가 일치하면 정합성 검증에 성공한다")
     void verifyLedgerIntegrityReturnsTrueWhenBalanced()
     {
-        String idempotencyKey = "test-verify-001";
+        String idempotencyKey =
+                "test-verify-001";
+
         Long driverId = 2L;
         Long paymentId = 200L;
-        LocalDate today = LocalDate.now();
 
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("10000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("10000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        LocalDate today =
+                LocalDate.now();
+
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("10000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("10000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 idempotencyKey,
@@ -156,9 +196,13 @@ class LedgerServiceTest
         );
 
         boolean balanced =
-                ledgerService.verifyLedgerIntegrity(today, today);
+                ledgerService.verifyLedgerIntegrity(
+                        today,
+                        today
+                );
 
-        assertThat(balanced).isTrue();
+        assertThat(balanced)
+                .isTrue();
     }
 
     /**
@@ -169,14 +213,32 @@ class LedgerServiceTest
     @DisplayName("조회 시작 날짜가 종료 날짜보다 이후이면 정합성 검증에 실패한다")
     void verifyLedgerIntegrityThrowsExceptionWhenFromIsAfterTo()
     {
-        LocalDate from = LocalDate.of(2026, 8, 22);
-        LocalDate to = LocalDate.of(2026, 8, 21);
+        LocalDate from =
+                LocalDate.of(
+                        2026,
+                        8,
+                        22
+                );
+
+        LocalDate to =
+                LocalDate.of(
+                        2026,
+                        8,
+                        21
+                );
 
         assertThatThrownBy(
-                () -> ledgerService.verifyLedgerIntegrity(from, to)
+                () -> ledgerService.verifyLedgerIntegrity(
+                        from,
+                        to
+                )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("조회 시작 날짜는 종료 날짜보다 이후일 수 없습니다.");
+                .isInstanceOf(
+                        InvalidDateRangeException.class
+                )
+                .hasMessage(
+                        "조회 시작 날짜는 종료 날짜보다 이후일 수 없습니다."
+                );
     }
 
     /**
@@ -186,24 +248,27 @@ class LedgerServiceTest
     @DisplayName("원장 금액에 소수점이 포함되면 분개 기록에 실패한다")
     void recordEntriesThrowsExceptionWhenAmountHasDecimal()
     {
-        String idempotencyKey = "test-decimal-001";
+        String idempotencyKey =
+                "test-decimal-001";
+
         Long driverId = 3L;
         Long paymentId = 300L;
 
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("10000.5"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("10000.5"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("10000.5"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("10000.5"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         assertThatThrownBy(
                 () -> ledgerService.recordEntries(
@@ -213,8 +278,12 @@ class LedgerServiceTest
                         entries
                 )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("원장 금액은 1원 단위의 정수여야 합니다.");
+                .isInstanceOf(
+                        InvalidAmountException.class
+                )
+                .hasMessage(
+                        "원장 금액은 1원 단위의 정수여야 합니다."
+                );
     }
 
     /**
@@ -224,24 +293,27 @@ class LedgerServiceTest
     @DisplayName("차변과 대변의 합계가 일치하지 않으면 분개 기록에 실패한다")
     void recordEntriesThrowsExceptionWhenDebitAndCreditAreUnbalanced()
     {
-        String idempotencyKey = "test-unbalanced-001";
+        String idempotencyKey =
+                "test-unbalanced-001";
+
         Long driverId = 4L;
         Long paymentId = 400L;
 
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("10000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("9000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("10000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("9000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         assertThatThrownBy(
                 () -> ledgerService.recordEntries(
@@ -251,52 +323,64 @@ class LedgerServiceTest
                         entries
                 )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("차변과 대변의 합이 일치하지 않습니다.");
+                .isInstanceOf(
+                        UnbalancedEntryException.class
+                )
+                .hasMessage(
+                        "차변과 대변의 합이 일치하지 않습니다."
+                );
     }
 
     /**
-     * 동일한 멱등성 키로 요청이 다시 전달될 때 기존 처리 결과를 반환하는지 확인합니다.
+     * 동일한 멱등성 키로 요청이 다시 전달될 때
+     * 기존 처리 결과를 반환하는지 확인합니다.
      */
     @Test
     @DisplayName("동일한 Idempotency-Key 재요청은 중복 분개를 생성하지 않는다")
     void recordEntriesDoesNotDuplicateEntriesWithSameIdempotencyKey()
     {
-        String idempotencyKey = "test-idempotency-001";
+        String idempotencyKey =
+                "test-idempotency-001";
+
         Long driverId = 5L;
         Long paymentId = 500L;
 
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
-        Long firstLedgerId = ledgerService.recordEntries(
-                idempotencyKey,
-                driverId,
-                "PAYMENT",
-                entries
-        );
+        Long firstLedgerId =
+                ledgerService.recordEntries(
+                        idempotencyKey,
+                        driverId,
+                        "PAYMENT",
+                        entries
+                );
 
-        Long secondLedgerId = ledgerService.recordEntries(
-                idempotencyKey,
-                driverId,
-                "PAYMENT",
-                entries
-        );
+        Long secondLedgerId =
+                ledgerService.recordEntries(
+                        idempotencyKey,
+                        driverId,
+                        "PAYMENT",
+                        entries
+                );
 
         assertThat(secondLedgerId)
-                .isEqualTo(firstLedgerId);
+                .isEqualTo(
+                        firstLedgerId
+                );
     }
 
     /**
@@ -306,20 +390,21 @@ class LedgerServiceTest
     @DisplayName("Idempotency-Key가 비어 있으면 분개 기록에 실패한다")
     void recordEntriesThrowsExceptionWhenIdempotencyKeyIsBlank()
     {
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("10000"),
-                        600L,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("10000"),
-                        600L,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("10000"),
+                                600L,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("10000"),
+                                600L,
+                                "PLATFORM"
+                        )
+                );
 
         assertThatThrownBy(
                 () -> ledgerService.recordEntries(
@@ -329,8 +414,12 @@ class LedgerServiceTest
                         entries
                 )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Idempotency-Key는 필수입니다.");
+                .isInstanceOf(
+                        InvalidLedgerRequestException.class
+                )
+                .hasMessage(
+                        "Idempotency-Key는 필수입니다."
+                );
     }
 
     /**
@@ -340,20 +429,21 @@ class LedgerServiceTest
     @DisplayName("지원하지 않는 entryType이면 분개 기록에 실패한다")
     void recordEntriesThrowsExceptionWhenEntryTypeIsInvalid()
     {
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("10000"),
-                        700L,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("10000"),
-                        700L,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("10000"),
+                                700L,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("10000"),
+                                700L,
+                                "PLATFORM"
+                        )
+                );
 
         assertThatThrownBy(
                 () -> ledgerService.recordEntries(
@@ -363,8 +453,12 @@ class LedgerServiceTest
                         entries
                 )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("지원하지 않는 entryType입니다.");
+                .isInstanceOf(
+                        InvalidEntryTypeException.class
+                )
+                .hasMessage(
+                        "지원하지 않는 entryType입니다."
+                );
     }
 
     /**
@@ -382,8 +476,12 @@ class LedgerServiceTest
                         List.of()
                 )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("분개 목록은 비어 있을 수 없습니다.");
+                .isInstanceOf(
+                        InvalidLedgerRequestException.class
+                )
+                .hasMessage(
+                        "분개 목록은 비어 있을 수 없습니다."
+                );
     }
 
     /**
@@ -393,20 +491,21 @@ class LedgerServiceTest
     @DisplayName("direction이 DEBIT 또는 CREDIT이 아니면 분개 기록에 실패한다")
     void recordEntriesThrowsExceptionWhenDirectionIsInvalid()
     {
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "ABC",
-                        new BigDecimal("10000"),
-                        900L,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("10000"),
-                        900L,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "ABC",
+                                new BigDecimal("10000"),
+                                900L,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("10000"),
+                                900L,
+                                "PLATFORM"
+                        )
+                );
 
         assertThatThrownBy(
                 () -> ledgerService.recordEntries(
@@ -416,8 +515,12 @@ class LedgerServiceTest
                         entries
                 )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("direction은 DEBIT 또는 CREDIT이어야 합니다.");
+                .isInstanceOf(
+                        InvalidDirectionException.class
+                )
+                .hasMessage(
+                        "direction은 DEBIT 또는 CREDIT이어야 합니다."
+                );
     }
 
     /**
@@ -427,20 +530,21 @@ class LedgerServiceTest
     @DisplayName("분개 금액이 null이면 분개 기록에 실패한다")
     void recordEntriesThrowsExceptionWhenAmountIsNull()
     {
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        null,
-                        1000L,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("10000"),
-                        1000L,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                null,
+                                1000L,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("10000"),
+                                1000L,
+                                "PLATFORM"
+                        )
+                );
 
         assertThatThrownBy(
                 () -> ledgerService.recordEntries(
@@ -450,8 +554,12 @@ class LedgerServiceTest
                         entries
                 )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("분개 금액은 필수입니다.");
+                .isInstanceOf(
+                        InvalidAmountException.class
+                )
+                .hasMessage(
+                        "분개 금액은 필수입니다."
+                );
     }
 
     /**
@@ -461,20 +569,21 @@ class LedgerServiceTest
     @DisplayName("SETTLEMENT 분개의 paymentId가 존재하면 분개 기록에 실패한다")
     void recordEntriesThrowsExceptionWhenSettlementHasPaymentId()
     {
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("10000"),
-                        1100L,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("10000"),
-                        null,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("10000"),
+                                1100L,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("10000"),
+                                null,
+                                "PLATFORM"
+                        )
+                );
 
         assertThatThrownBy(
                 () -> ledgerService.recordEntries(
@@ -484,8 +593,12 @@ class LedgerServiceTest
                         entries
                 )
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("SETTLEMENT 분개의 paymentId는 null이어야 합니다.");
+                .isInstanceOf(
+                        InvalidSettlementEntryException.class
+                )
+                .hasMessage(
+                        "SETTLEMENT 분개의 paymentId는 null이어야 합니다."
+                );
     }
 
     /**
@@ -498,20 +611,21 @@ class LedgerServiceTest
         Long driverId = 12L;
         Long paymentId = 1200L;
 
-        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> paymentEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-payment-cancel-payment-001",
@@ -521,25 +635,30 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterPayment =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterPayment)
-                .isEqualByComparingTo(new BigDecimal("15000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("15000")
+                );
 
-        List<LedgerEntryRequest.EntryDetail> cancelEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> cancelEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-payment-cancel-001",
@@ -549,16 +668,25 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterCancel =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterCancel)
-                .isEqualByComparingTo(BigDecimal.ZERO);
+                .isEqualByComparingTo(
+                        BigDecimal.ZERO
+                );
 
         UnpaidDriverListResponse unpaidList =
-                ledgerService.getUnpaidBalances(LocalDate.now());
+                ledgerService.getUnpaidBalances(
+                        LocalDate.now()
+                );
 
         assertThat(unpaidList.getData())
-                .noneMatch(data -> data.getDriverId().equals(driverId));
+                .noneMatch(data ->
+                        data.getDriverId()
+                                .equals(driverId)
+                );
     }
 
     /**
@@ -572,23 +700,27 @@ class LedgerServiceTest
         Long driverId = 13L;
         Long paymentId = 1300L;
 
-        LocalDate today = LocalDate.now();
-        LocalDate yesterday = today.minusDays(1);
+        LocalDate today =
+                LocalDate.now();
 
-        List<LedgerEntryRequest.EntryDetail> entries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        LocalDate yesterday =
+                today.minusDays(1);
+
+        List<LedgerEntryRequest.EntryDetail> entries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-date-boundary-001",
@@ -600,35 +732,53 @@ class LedgerServiceTest
         BigDecimal yesterdayBalance =
                 ledgerService.calculateDriverUnpaidBalance(
                         driverId,
-                        yesterday.atTime(LocalTime.MAX)
+                        yesterday.atTime(
+                                LocalTime.MAX
+                        )
                 );
 
         BigDecimal todayBalance =
                 ledgerService.calculateDriverUnpaidBalance(
                         driverId,
-                        today.atTime(LocalTime.MAX)
+                        today.atTime(
+                                LocalTime.MAX
+                        )
                 );
 
         assertThat(yesterdayBalance)
-                .isEqualByComparingTo(BigDecimal.ZERO);
+                .isEqualByComparingTo(
+                        BigDecimal.ZERO
+                );
 
         assertThat(todayBalance)
-                .isEqualByComparingTo(new BigDecimal("15000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("15000")
+                );
 
         UnpaidDriverListResponse yesterdayUnpaidList =
-                ledgerService.getUnpaidBalances(yesterday);
+                ledgerService.getUnpaidBalances(
+                        yesterday
+                );
 
         UnpaidDriverListResponse todayUnpaidList =
-                ledgerService.getUnpaidBalances(today);
+                ledgerService.getUnpaidBalances(
+                        today
+                );
 
         assertThat(yesterdayUnpaidList.getData())
-                .noneMatch(data -> data.getDriverId().equals(driverId));
+                .noneMatch(data ->
+                        data.getDriverId()
+                                .equals(driverId)
+                );
 
         assertThat(todayUnpaidList.getData())
                 .anyMatch(data ->
-                        data.getDriverId().equals(driverId)
+                        data.getDriverId()
+                                .equals(driverId)
                                 && data.getTotalUnpaidAmount()
-                                .compareTo(new BigDecimal("15000")) == 0
+                                .compareTo(
+                                        new BigDecimal("15000")
+                                ) == 0
                 );
     }
 
@@ -642,20 +792,21 @@ class LedgerServiceTest
         Long driverId = 14L;
         Long paymentId = 1400L;
 
-        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> paymentEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-partial-cancel-payment-001",
@@ -665,25 +816,30 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterPayment =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterPayment)
-                .isEqualByComparingTo(new BigDecimal("15000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("15000")
+                );
 
-        List<LedgerEntryRequest.EntryDetail> cancelEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("5000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("5000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> cancelEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("5000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("5000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-partial-cancel-001",
@@ -693,19 +849,28 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterCancel =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterCancel)
-                .isEqualByComparingTo(new BigDecimal("10000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("10000")
+                );
 
         UnpaidDriverListResponse unpaidList =
-                ledgerService.getUnpaidBalances(LocalDate.now());
+                ledgerService.getUnpaidBalances(
+                        LocalDate.now()
+                );
 
         assertThat(unpaidList.getData())
                 .anyMatch(data ->
-                        data.getDriverId().equals(driverId)
+                        data.getDriverId()
+                                .equals(driverId)
                                 && data.getTotalUnpaidAmount()
-                                .compareTo(new BigDecimal("10000")) == 0
+                                .compareTo(
+                                        new BigDecimal("10000")
+                                ) == 0
                 );
     }
 
@@ -719,20 +884,21 @@ class LedgerServiceTest
         Long driverId = 15L;
         Long paymentId = 1500L;
 
-        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> paymentEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-partial-settlement-payment-001",
@@ -742,25 +908,30 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterPayment =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterPayment)
-                .isEqualByComparingTo(new BigDecimal("15000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("15000")
+                );
 
-        List<LedgerEntryRequest.EntryDetail> settlementEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("5000"),
-                        null,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("5000"),
-                        null,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> settlementEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("5000"),
+                                null,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("5000"),
+                                null,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-partial-settlement-001",
@@ -770,19 +941,28 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterSettlement =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterSettlement)
-                .isEqualByComparingTo(new BigDecimal("10000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("10000")
+                );
 
         UnpaidDriverListResponse unpaidList =
-                ledgerService.getUnpaidBalances(LocalDate.now());
+                ledgerService.getUnpaidBalances(
+                        LocalDate.now()
+                );
 
         assertThat(unpaidList.getData())
                 .anyMatch(data ->
-                        data.getDriverId().equals(driverId)
+                        data.getDriverId()
+                                .equals(driverId)
                                 && data.getTotalUnpaidAmount()
-                                .compareTo(new BigDecimal("10000")) == 0
+                                .compareTo(
+                                        new BigDecimal("10000")
+                                ) == 0
                 );
     }
 
@@ -797,20 +977,21 @@ class LedgerServiceTest
         Long driverId = 16L;
         Long paymentId = 1600L;
 
-        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> paymentEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-combined-payment-001",
@@ -820,25 +1001,30 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterPayment =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterPayment)
-                .isEqualByComparingTo(new BigDecimal("15000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("15000")
+                );
 
-        List<LedgerEntryRequest.EntryDetail> cancelEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("5000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("5000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> cancelEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("5000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("5000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-combined-cancel-001",
@@ -848,25 +1034,30 @@ class LedgerServiceTest
         );
 
         BigDecimal balanceAfterCancel =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(balanceAfterCancel)
-                .isEqualByComparingTo(new BigDecimal("10000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("10000")
+                );
 
-        List<LedgerEntryRequest.EntryDetail> settlementEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("4000"),
-                        null,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("4000"),
-                        null,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> settlementEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("4000"),
+                                null,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("4000"),
+                                null,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-combined-settlement-001",
@@ -876,19 +1067,28 @@ class LedgerServiceTest
         );
 
         BigDecimal finalBalance =
-                ledgerService.calculateDriverUnpaidBalance(driverId);
+                ledgerService.calculateDriverUnpaidBalance(
+                        driverId
+                );
 
         assertThat(finalBalance)
-                .isEqualByComparingTo(new BigDecimal("6000"));
+                .isEqualByComparingTo(
+                        new BigDecimal("6000")
+                );
 
         UnpaidDriverListResponse unpaidList =
-                ledgerService.getUnpaidBalances(LocalDate.now());
+                ledgerService.getUnpaidBalances(
+                        LocalDate.now()
+                );
 
         assertThat(unpaidList.getData())
                 .anyMatch(data ->
-                        data.getDriverId().equals(driverId)
+                        data.getDriverId()
+                                .equals(driverId)
                                 && data.getTotalUnpaidAmount()
-                                .compareTo(new BigDecimal("6000")) == 0
+                                .compareTo(
+                                        new BigDecimal("6000")
+                                ) == 0
                 );
     }
 
@@ -903,20 +1103,21 @@ class LedgerServiceTest
         Long driverId = 17L;
         Long paymentId = 1700L;
 
-        List<LedgerEntryRequest.EntryDetail> paymentEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("15000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> paymentEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("15000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-payment-details-payment-001",
@@ -925,20 +1126,21 @@ class LedgerServiceTest
                 paymentEntries
         );
 
-        List<LedgerEntryRequest.EntryDetail> cancelEntries = List.of(
-                new LedgerEntryRequest.EntryDetail(
-                        "DEBIT",
-                        new BigDecimal("5000"),
-                        paymentId,
-                        "DRIVER"
-                ),
-                new LedgerEntryRequest.EntryDetail(
-                        "CREDIT",
-                        new BigDecimal("5000"),
-                        paymentId,
-                        "PLATFORM"
-                )
-        );
+        List<LedgerEntryRequest.EntryDetail> cancelEntries =
+                List.of(
+                        new LedgerEntryRequest.EntryDetail(
+                                "DEBIT",
+                                new BigDecimal("5000"),
+                                paymentId,
+                                "DRIVER"
+                        ),
+                        new LedgerEntryRequest.EntryDetail(
+                                "CREDIT",
+                                new BigDecimal("5000"),
+                                paymentId,
+                                "PLATFORM"
+                        )
+                );
 
         ledgerService.recordEntries(
                 "test-payment-details-cancel-001",
@@ -948,7 +1150,9 @@ class LedgerServiceTest
         );
 
         var paymentDetails =
-                ledgerService.getPaymentDetails(driverId);
+                ledgerService.getPaymentDetails(
+                        driverId
+                );
 
         assertThat(paymentDetails)
                 .hasSize(2);
@@ -960,7 +1164,9 @@ class LedgerServiceTest
                             .isEqualTo(paymentId);
 
                     assertThat(detail.getAmount())
-                            .isEqualByComparingTo(new BigDecimal("15000"));
+                            .isEqualByComparingTo(
+                                    new BigDecimal("15000")
+                            );
 
                     assertThat(detail.getEntryType())
                             .isEqualTo("PAYMENT");
@@ -973,10 +1179,14 @@ class LedgerServiceTest
                             .isEqualTo(paymentId);
 
                     assertThat(detail.getAmount())
-                            .isEqualByComparingTo(new BigDecimal("5000"));
+                            .isEqualByComparingTo(
+                                    new BigDecimal("5000")
+                            );
 
                     assertThat(detail.getEntryType())
-                            .isEqualTo("PAYMENT_CANCEL");
+                            .isEqualTo(
+                                    "PAYMENT_CANCEL"
+                            );
                 });
     }
 }
