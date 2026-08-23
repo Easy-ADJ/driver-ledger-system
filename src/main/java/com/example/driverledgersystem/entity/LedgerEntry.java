@@ -2,23 +2,21 @@ package com.example.driverledgersystem.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
  * 원장의 개별 분개 내역을 저장하는 엔티티입니다.
- * <p>
+ *
  * 하나의 거래는 차변(DEBIT)과 대변(CREDIT) 분개로 구성되며,
  * PAYMENT, PAYMENT_CANCEL, SETTLEMENT 유형을 지원합니다.
  */
@@ -42,7 +40,6 @@ import java.time.LocalDateTime;
 )
 @Getter
 @Setter
-@EntityListeners(AuditingEntityListener.class)
 public class LedgerEntry
 {
     @Id
@@ -85,10 +82,19 @@ public class LedgerEntry
     )
     private BigDecimal amount;
 
-    @CreatedDate
     @Column(
             name = "approved_at",
+            nullable = false,
             updatable = false
     )
     private LocalDateTime approvedAt;
+
+    @PrePersist
+    public void setDefaultApprovedAt()
+    {
+        if (approvedAt == null)
+        {
+            approvedAt = LocalDateTime.now();
+        }
+    }
 }
