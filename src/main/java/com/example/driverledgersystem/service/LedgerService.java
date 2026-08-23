@@ -83,15 +83,147 @@ public class LedgerService
             entry.setDirection(detail.getDirection());
             entry.setAmount(detail.getAmount());
 
-            LedgerEntry savedEntry = entryRepository.save(entry);
+            LedgerEntry savedEntry =
+                    entryRepository.save(entry);
 
             if (firstLedgerId == null)
             {
-                firstLedgerId = savedEntry.getLedgerId();
+                firstLedgerId =
+                        savedEntry.getLedgerId();
             }
         }
 
         return firstLedgerId;
+    }
+
+    /**
+     * 결제 서버에서 가져온 결제 데이터를 PAYMENT 분개로 저장합니다.
+     * <p>
+     * 동일 driverId, paymentId의 PAYMENT 분개가 이미 존재하면
+     * 다시 저장하지 않습니다.
+     *
+     * @param driverId   기사 ID
+     * @param paymentId  결제 ID
+     * @param amount     결제 금액
+     * @param approvedAt 결제 승인 시각
+     * @return 새로 저장했으면 true, 기존 결제면 false
+     */
+    @Transactional
+    public boolean recordImportedPayment(
+            Long driverId,
+            Long paymentId,
+            BigDecimal amount,
+            LocalDateTime approvedAt
+    )
+    {
+        if (driverId == null)
+        {
+            throw new IllegalArgumentException(
+                    "driverId는 필수입니다."
+            );
+        }
+
+        if (paymentId == null)
+        {
+            throw new IllegalArgumentException(
+                    "paymentId는 필수입니다."
+            );
+        }
+
+        validateAmount(amount);
+
+        if (approvedAt == null)
+        {
+            throw new IllegalArgumentException(
+                    "approvedAt은 필수입니다."
+            );
+        }
+
+        boolean exists =
+                entryRepository
+                        .existsByDriverIdAndPaymentIdAndEntryType(
+                                driverId,
+                                paymentId,
+                                EntryType.PAYMENT.name()
+                        );
+
+        if (exists)
+        {
+            log.info(
+                    "이미 원장에 존재하는 결제입니다. - driverId: {}, paymentId: {}",
+                    driverId,
+                    paymentId
+            );
+
+            return false;
+        }
+
+        String idempotencyKey =
+                "payment-import-" + paymentId;
+
+        LedgerEntry platformEntry =
+                new LedgerEntry();
+
+        platformEntry.setIdempotencyKey(
+                idempotencyKey
+        );
+        platformEntry.setPaymentId(
+                paymentId
+        );
+        platformEntry.setEntryType(
+                EntryType.PAYMENT.name()
+        );
+        platformEntry.setDirection(
+                Direction.DEBIT.name()
+        );
+        platformEntry.setAmount(
+                amount
+        );
+        platformEntry.setApprovedAt(
+                approvedAt
+        );
+
+        LedgerEntry driverEntry =
+                new LedgerEntry();
+
+        driverEntry.setIdempotencyKey(
+                idempotencyKey
+        );
+        driverEntry.setDriverId(
+                driverId
+        );
+        driverEntry.setPaymentId(
+                paymentId
+        );
+        driverEntry.setEntryType(
+                EntryType.PAYMENT.name()
+        );
+        driverEntry.setDirection(
+                Direction.CREDIT.name()
+        );
+        driverEntry.setAmount(
+                amount
+        );
+        driverEntry.setApprovedAt(
+                approvedAt
+        );
+
+        entryRepository.save(
+                platformEntry
+        );
+
+        entryRepository.save(
+                driverEntry
+        );
+
+        log.info(
+                "결제 서버 데이터 원장 저장 완료 - driverId: {}, paymentId: {}, amount: {}",
+                driverId,
+                paymentId,
+                amount
+        );
+
+        return true;
     }
 
     /**
@@ -169,10 +301,10 @@ public class LedgerService
 
     /**
      * 기사에게 발생한 결제 분개 내역을 조회합니다.
-     *
+     * <p>
      * from, to가 모두 null이면 전체 결제 내역을 조회합니다.
      * from, to가 모두 지정되면 해당 기간의 결제 내역만 조회합니다.
-     *
+     * <p>
      * 조회 기간은 from의 00:00:00 이상,
      * to 다음 날의 00:00:00 미만으로 처리합니다.
      *
@@ -208,8 +340,7 @@ public class LedgerService
                             driverId,
                             paymentEntryTypes
                     );
-        }
-        else
+        } else
         {
             LocalDateTime startInclusive =
                     from.atStartOfDay();
@@ -241,7 +372,7 @@ public class LedgerService
 
     /**
      * 결제 내역 조회 기간 파라미터를 검증합니다.
-     *
+     * <p>
      * from과 to는 둘 다 존재하거나 둘 다 없어야 합니다.
      *
      * @param from 조회 시작 날짜
@@ -456,8 +587,7 @@ public class LedgerService
         try
         {
             EntryType.valueOf(entryType);
-        }
-        catch (IllegalArgumentException e)
+        } catch (IllegalArgumentException e)
         {
             throw new IllegalArgumentException(
                     "지원하지 않는 entryType입니다."
@@ -512,8 +642,7 @@ public class LedgerService
         try
         {
             Direction.valueOf(direction);
-        }
-        catch (IllegalArgumentException e)
+        } catch (IllegalArgumentException e)
         {
             throw new IllegalArgumentException(
                     "direction은 DEBIT 또는 CREDIT이어야 합니다."
@@ -532,6 +661,13 @@ public class LedgerService
         {
             throw new IllegalArgumentException(
                     "분개 금액은 필수입니다."
+            );
+        }
+
+        if (amount.signum() <= 0)
+        {
+            throw new IllegalArgumentException(
+                    "분개 금액은 0보다 커야 합니다."
             );
         }
 
@@ -559,8 +695,7 @@ public class LedgerService
             {
                 totalDebit =
                         totalDebit.add(entry.getAmount());
-            }
-            else
+            } else
             {
                 totalCredit =
                         totalCredit.add(entry.getAmount());
