@@ -1,6 +1,7 @@
 package com.example.driverledgersystem.client;
 
 import com.example.driverledgersystem.dto.PaymentLedgerResponse;
+import com.example.driverledgersystem.exception.PaymentServiceException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -35,25 +36,37 @@ public class PaymentClient
      */
     public List<PaymentLedgerResponse> getPayments(Long driverId)
     {
-        PaymentLedgerResponse[] response =
-                restClient.get()
-                        .uri(uriBuilder ->
-                                uriBuilder
-                                        .path("/api/ledger")
-                                        .queryParam(
-                                                "driver_id",
-                                                driverId
-                                        )
-                                        .build()
-                        )
-                        .retrieve()
-                        .body(PaymentLedgerResponse[].class);
-
-        if (response == null)
+        try
         {
-            return List.of();
-        }
+            PaymentLedgerResponse[] response =
+                    restClient.get()
+                            .uri(uriBuilder ->
+                                    uriBuilder
+                                            .path("/api/ledger")
+                                            .queryParam(
+                                                    "driver_id",
+                                                    driverId
+                                            )
+                                            .build()
+                            )
+                            .retrieve()
+                            .body(
+                                    PaymentLedgerResponse[].class
+                            );
 
-        return Arrays.asList(response);
+            if (response == null)
+            {
+                return List.of();
+            }
+
+            return Arrays.asList(response);
+        }
+        catch (Exception e)
+        {
+            throw new PaymentServiceException(
+                    e.getMessage(),
+                    e
+            );
+        }
     }
 }

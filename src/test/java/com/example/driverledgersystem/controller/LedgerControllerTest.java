@@ -2,6 +2,8 @@ package com.example.driverledgersystem.controller;
 
 import com.example.driverledgersystem.dto.UnpaidDriverListResponse;
 import com.example.driverledgersystem.exception.GlobalExceptionHandler;
+import com.example.driverledgersystem.exception.InvalidDateRangeException;
+import com.example.driverledgersystem.exception.UnbalancedEntryException;
 import com.example.driverledgersystem.service.LedgerService;
 import com.example.driverledgersystem.service.PaymentSyncService;
 import org.junit.jupiter.api.BeforeEach;
@@ -119,12 +121,12 @@ class LedgerControllerTest
     }
 
     /**
-     * 분개 기록 과정에서 잘못된 요청 예외가 발생한 경우
-     * 공통 오류 응답을 반환하는지 확인합니다.
+     * 분개 기록 과정에서 차변과 대변의 합이 일치하지 않는 경우
+     * UNBALANCED_ENTRY 오류를 반환하는지 확인합니다.
      */
     @Test
-    @DisplayName("잘못된 분개 기록 요청은 400과 ErrorResponse를 반환한다")
-    void recordEntriesReturnsBadRequestWhenRequestIsInvalid() throws Exception
+    @DisplayName("차변과 대변의 합이 다르면 400과 UNBALANCED_ENTRY를 반환한다")
+    void recordEntriesReturnsBadRequestWhenRequestIsUnbalanced() throws Exception
     {
         when(ledgerService.recordEntries(
                 anyString(),
@@ -133,9 +135,7 @@ class LedgerControllerTest
                 any()
         ))
                 .thenThrow(
-                        new IllegalArgumentException(
-                                "차변과 대변의 합이 일치하지 않습니다."
-                        )
+                        new UnbalancedEntryException()
                 );
 
         String requestBody = """
@@ -175,7 +175,7 @@ class LedgerControllerTest
                 )
                 .andExpect(
                         jsonPath("$.code")
-                                .value("INVALID_REQUEST")
+                                .value("UNBALANCED_ENTRY")
                 )
                 .andExpect(
                         jsonPath("$.message")
@@ -185,7 +185,7 @@ class LedgerControllerTest
                 )
                 .andExpect(
                         jsonPath("$.transactionId")
-                                .doesNotExist()
+                                .isNotEmpty()
                 );
     }
 
@@ -410,10 +410,11 @@ class LedgerControllerTest
     }
 
     /**
-     * 잘못된 정합성 조회 기간에 대해 400 Bad Request를 반환하는지 확인합니다.
+     * 잘못된 정합성 조회 기간에 대해
+     * INVALID_DATE_RANGE 오류를 반환하는지 확인합니다.
      */
     @Test
-    @DisplayName("from이 to보다 이후이면 verify API는 400 Bad Request를 반환한다")
+    @DisplayName("from이 to보다 이후이면 verify API는 400과 INVALID_DATE_RANGE를 반환한다")
     void verifyLedgerReturnsBadRequestWhenFromIsAfterTo() throws Exception
     {
         LocalDate from =
@@ -437,9 +438,7 @@ class LedgerControllerTest
                 )
         )
                 .thenThrow(
-                        new IllegalArgumentException(
-                                "조회 시작 날짜는 종료 날짜보다 이후일 수 없습니다."
-                        )
+                        InvalidDateRangeException.reversed()
                 );
 
         mockMvc.perform(
@@ -458,13 +457,17 @@ class LedgerControllerTest
                 )
                 .andExpect(
                         jsonPath("$.code")
-                                .value("INVALID_REQUEST")
+                                .value("INVALID_DATE_RANGE")
                 )
                 .andExpect(
                         jsonPath("$.message")
                                 .value(
                                         "조회 시작 날짜는 종료 날짜보다 이후일 수 없습니다."
                                 )
+                )
+                .andExpect(
+                        jsonPath("$.transactionId")
+                                .isNotEmpty()
                 );
     }
 }
